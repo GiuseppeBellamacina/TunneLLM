@@ -42,7 +42,7 @@ SUDO=
 USER_LOCAL=false
 
 if [ "$(id -u)" -ne 0 ]; then
-    if command -v sudo >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
         SUDO="sudo"
     else
         USER_LOCAL=true

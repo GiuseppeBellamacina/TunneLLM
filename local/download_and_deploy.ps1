@@ -181,7 +181,7 @@ if (-not $SkipInstall) {
     Write-Host ">>> Running installer on remote server..." -ForegroundColor Cyan
     
     $archiveName = Split-Path $archiveFile -Leaf
-    ssh -p $SshPort $SshTarget "cd $RemoteDir && OLLAMA_ARCHIVE='$RemoteDir/$archiveName' bash setup.sh"
+    ssh -p $SshPort $SshTarget "cd $RemoteDir && OLLAMA_ARCHIVE=`"`$PWD/$archiveName`" bash setup.sh"
     
     Write-Host ""
     Write-Host "=== Installation complete! ===" -ForegroundColor Green

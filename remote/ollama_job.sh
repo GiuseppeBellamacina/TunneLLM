@@ -6,7 +6,6 @@
 #SBATCH --mem=48G
 #SBATCH --cpus-per-task=4
 #SBATCH --time=12:00:00
-# ── Decommentare e adattare con il proprio account/partizione/qos ──
 # #SBATCH --account=dl-course-q2
 # #SBATCH --partition=dl-course-q2
 # #SBATCH --qos=gpu-xlarge
