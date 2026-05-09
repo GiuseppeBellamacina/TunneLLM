@@ -165,7 +165,9 @@ cd C:\Users\TUO_UTENTE\Codici\TunneLLM\local
 
 ## Passo 6: Avvia Ollama sul server
 
-Connettiti al server e avvia Ollama:
+### Caso A: Server standalone (senza SLURM)
+
+Se il server ti dà accesso diretto alla GPU:
 
 ```powershell
 ssh user@server
@@ -173,32 +175,109 @@ cd ~/ollama-server
 bash start_server.sh
 ```
 
-Dovresti vedere:
-
-```
-==> Starting Ollama server on 127.0.0.1:11434
-    Model: qwen2.5:14b
-==> Waiting for Ollama to start...
-==> Ollama is ready.
-==> Loading model: qwen2.5:14b
-==> Model loaded. Ollama is serving on 127.0.0.1:11434
-```
-
 > **Importante:** Lascia questo terminale aperto! Se lo chiudi, Ollama si ferma.
 > Per farlo girare in background puoi usare `screen` o `tmux`:
 >
 > ```bash
-> # Installa screen se non c'è (richiede internet o pacchetto già presente)
 > screen -S ollama
 > bash start_server.sh
 > # Premi Ctrl+A poi D per staccarti dalla sessione
 > # Per riattaccarti: screen -r ollama
 > ```
 
+### Caso B: Cluster con SLURM (es. cluster DMI UniCT)
+
+Su un cluster SLURM le GPU sono disponibili **solo dentro un job**. Non puoi avviare Ollama direttamente sul login node.
+
+#### 6b.1. Modifica le direttive SLURM
+
+Prima di lanciare il job, apri `ollama_job.sh` e decommenta/adatta le righe con il tuo account:
+
+```bash
+#SBATCH --account=dl-course-q2        # ← il tuo account
+#SBATCH --partition=dl-course-q2      # ← la tua partizione
+#SBATCH --qos=gpu-xlarge              # ← QoS con abbastanza VRAM
+```
+
+> **Come trovo il mio account/partizione/QoS?**
+>
+> ```bash
+> ssh user@server
+> sacctmgr show associations user=$USER format=Account,Partition,QOS -P
+> ```
+
+> **Quale QoS scegliere?**
+>
+> | QoS        | VRAM   | Tempo max | Per quale modello      |
+> | ---------- | ------ | --------- | ---------------------- |
+> | gpu-medium | 5.5 GB | 6h        | Modelli piccoli (1-3B) |
+> | gpu-large  | 11 GB  | 12h       | Modelli medi (7-8B)    |
+> | gpu-xlarge | 22 GB  | 12h       | Modelli grandi (14B+)  |
+
+#### 6b.2. Lancia il job
+
+```bash
+ssh user@server
+cd ~/ollama-server
+sbatch ollama_job.sh
+```
+
+Oppure con un modello specifico:
+
+```bash
+sbatch ollama_job.sh qwen2.5:7b
+```
+
+#### 6b.3. Trova il nodo assegnato
+
+Dopo che il job parte, controlla su quale nodo è finito:
+
+```bash
+# Opzione 1: dal file generato automaticamente
+cat ~/ollama-server/node_info.txt
+
+# Opzione 2: da squeue
+squeue --me
+```
+
+Il file `node_info.txt` contiene qualcosa tipo:
+
+```
+NODE=gnode10
+PORT=11434
+MODEL=qwen2.5:14b
+JOB_ID=12345
+```
+
+**Prendi nota del valore di `NODE`** (es. `gnode10`) — ti serve al passo successivo.
+
+#### 6b.4. Configura REMOTE_HOST
+
+Nel file `.env` sul tuo PC locale, imposta `REMOTE_HOST` con il nome del nodo:
+
+```env
+REMOTE_HOST=gnode10
+```
+
+> **Nota:** Ogni volta che lanci un nuovo job SLURM, il nodo potrebbe cambiare. Dovrai aggiornare `REMOTE_HOST` nel `.env` e riavviare il proxy locale.
+
+#### 6b.5. Monitora e gestisci il job
+
+```bash
+# Vedi i log
+tail -f ollama-<JOB_ID>.log
+
+# Controlla stato
+squeue --me
+
+# Ferma il job
+scancel <JOB_ID>
+```
+
 > **Se vuoi usare un modello diverso:**
 >
 > ```bash
-> MODEL=llama3:8b bash start_server.sh
+> sbatch ollama_job.sh llama3:8b
 > ```
 
 ---
@@ -241,6 +320,8 @@ SSH_KEY_PATH=~/.ssh/id_rsa
 # SSH_PASSWORD=la-tua-password
 
 # Queste di solito non vanno cambiate
+# Per cluster SLURM: imposta REMOTE_HOST al nodo GPU (es. gnode10)
+#   → lo trovi in ~/ollama-server/node_info.txt dopo sbatch
 REMOTE_HOST=127.0.0.1
 REMOTE_PORT=11434
 LOCAL_HOST=127.0.0.1
@@ -341,11 +422,22 @@ Aggiungi questo blocco nel JSON delle impostazioni:
 
 Per usare il tutto, devono essere attivi **contemporaneamente**:
 
+### Server standalone (senza SLURM)
+
 | Dove              | Cosa           | Comando                                                        |
 | ----------------- | -------------- | -------------------------------------------------------------- |
 | **Server remoto** | Ollama         | `ssh user@server "cd ~/ollama-server && bash start_server.sh"` |
 | **PC locale**     | Proxy TunneLLM | `cd local && python main.py`                                   |
 | **VS Code**       | Copilot Chat   | Seleziona il modello TunneLLM                                  |
+
+### Cluster SLURM
+
+| Dove          | Cosa              | Comando                                                        |
+| ------------- | ----------------- | -------------------------------------------------------------- |
+| **Cluster**   | Job SLURM         | `ssh user@server "cd ~/ollama-server && sbatch ollama_job.sh"` |
+| **PC locale** | `.env` aggiornato | `REMOTE_HOST=gnode10` (il nodo dal job)                        |
+| **PC locale** | Proxy TunneLLM    | `cd local && python main.py`                                   |
+| **VS Code**   | Copilot Chat      | Seleziona il modello TunneLLM                                  |
 
 ---
 
@@ -360,7 +452,8 @@ Per usare il tutto, devono essere attivi **contemporaneamente**:
 ### "ollama: down" nel health check
 
 - Ollama non è in esecuzione sul server
-- Connettiti al server e avvia: `bash start_server.sh`
+- **Server standalone:** connettiti e avvia `bash start_server.sh`
+- **Cluster SLURM:** controlla che il job sia attivo (`squeue --me`) e che `REMOTE_HOST` nel `.env` punti al nodo giusto
 - Controlla se Ollama è crashato: `ssh user@server "ps aux | grep ollama"`
 
 ### Copilot non mostra il modello
@@ -391,6 +484,8 @@ Se il modello non appare, devi trasferirlo di nuovo (Passo 5).
 
 ## Comandi rapidi di riferimento
 
+### Server standalone
+
 ```powershell
 # === SETUP (una tantum) ===
 # Installa Ollama sul server
@@ -410,4 +505,34 @@ cd C:\Users\TUO_UTENTE\Codici\TunneLLM\local
 python main.py
 
 # 3. Apri VS Code e usa Copilot con il modello TunneLLM
+```
+
+### Cluster SLURM
+
+```powershell
+# === SETUP (una tantum) ===
+cd local
+.\download_and_deploy.ps1 -SshTarget "user@server"
+ollama pull qwen2.5:14b
+.\transfer_model.ps1 -SshTarget "user@server"
+
+# === USO QUOTIDIANO ===
+# 1. Lancia il job SLURM
+ssh user@server "cd ~/ollama-server && sbatch ollama_job.sh"
+
+# 2. Trova il nodo assegnato
+ssh user@server "cat ~/ollama-server/node_info.txt"
+#    → prendi il valore di NODE (es. gnode10)
+
+# 3. Aggiorna REMOTE_HOST nel .env con il nodo
+#    REMOTE_HOST=gnode10
+
+# 4. Avvia il proxy locale
+cd C:\Users\TUO_UTENTE\Codici\TunneLLM\local
+python main.py
+
+# 5. Apri VS Code e usa Copilot
+
+# === FERMARE IL JOB ===
+ssh user@server "scancel <JOB_ID>"
 ```

@@ -2,13 +2,21 @@
 set -euo pipefail
 
 # ============================================================
-# Start Ollama server
-# Bound to 127.0.0.1 only (access via SSH tunnel)
+# Start Ollama server (standalone mode, no SLURM)
+#
+# For SLURM clusters, use ollama_job.sh instead:
+#   sbatch ollama_job.sh
+#
+# This script is for servers where you have direct access
+# and don't need a job scheduler.
 # ============================================================
 
 MODEL="${MODEL:-qwen2.5:14b}"
 OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"
 export OLLAMA_HOST
+
+# Ensure PATH includes user-local install
+export PATH="$HOME/.local/bin:$PATH"
 
 echo "==> Starting Ollama server on $OLLAMA_HOST"
 echo "    Model: $MODEL"

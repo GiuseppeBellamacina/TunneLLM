@@ -4,9 +4,10 @@ set -euo pipefail
 # ============================================================
 # Remote Server Setup — Ollama (Offline Installation)
 #
-# This script installs Ollama from a local archive transferred
-# via SCP. It mirrors the official install.sh logic but works
-# completely offline.
+# Installs Ollama from a local archive transferred via SCP.
+# Works completely offline. Supports both:
+#   - Root/sudo install (system-wide, /usr/local/)
+#   - User-local install (no root needed, ~/.local/)
 #
 # Usage:
 #   OLLAMA_ARCHIVE=/path/to/ollama-linux-amd64.tgz bash setup.sh
@@ -35,23 +36,32 @@ if [ ! -f "$OLLAMA_ARCHIVE" ]; then
     exit 1
 fi
 
-# ── Determine install directory ─────────────────────────────
+# ── Determine install mode ──────────────────────────────────
 
 SUDO=
+USER_LOCAL=false
+
 if [ "$(id -u)" -ne 0 ]; then
     if command -v sudo >/dev/null 2>&1; then
         SUDO="sudo"
     else
-        echo "WARNING: Not running as root and sudo not available."
-        echo "         Installing to user-local directory."
+        USER_LOCAL=true
     fi
 fi
 
-# Find a suitable bin directory in PATH
-for BINDIR in /usr/local/bin /usr/bin /bin; do
-    echo "$PATH" | grep -q "$BINDIR" && break || continue
-done
-OLLAMA_INSTALL_DIR=$(dirname "${BINDIR}")
+if [ "$USER_LOCAL" = true ]; then
+    # User-local install (cluster / no root)
+    OLLAMA_INSTALL_DIR="$HOME/.local"
+    BINDIR="$HOME/.local/bin"
+    echo "==> User-local install (no root/sudo detected)"
+else
+    # System-wide install
+    for BINDIR in /usr/local/bin /usr/bin /bin; do
+        echo "$PATH" | grep -q "$BINDIR" && break || continue
+    done
+    OLLAMA_INSTALL_DIR=$(dirname "${BINDIR}")
+    echo "==> System-wide install"
+fi
 
 # ── Clean old installation ──────────────────────────────────
 
@@ -65,8 +75,13 @@ fi
 echo "==> Installing Ollama from: $OLLAMA_ARCHIVE"
 echo "    Install directory: $OLLAMA_INSTALL_DIR"
 
-$SUDO install -o0 -g0 -m755 -d "$BINDIR"
-$SUDO install -o0 -g0 -m755 -d "$OLLAMA_INSTALL_DIR/lib/ollama"
+if [ "$USER_LOCAL" = true ]; then
+    mkdir -p "$BINDIR"
+    mkdir -p "$OLLAMA_INSTALL_DIR/lib/ollama"
+else
+    $SUDO install -o0 -g0 -m755 -d "$BINDIR"
+    $SUDO install -o0 -g0 -m755 -d "$OLLAMA_INSTALL_DIR/lib/ollama"
+fi
 
 case "$OLLAMA_ARCHIVE" in
     *.tar.zst)
@@ -88,7 +103,10 @@ esac
 
 # ── Create symlink if needed ────────────────────────────────
 
-if [ "$OLLAMA_INSTALL_DIR/bin/ollama" != "$BINDIR/ollama" ]; then
+if [ -f "$OLLAMA_INSTALL_DIR/bin/ollama" ] && [ "$OLLAMA_INSTALL_DIR/bin/ollama" != "$BINDIR/ollama" ]; then
+    echo "==> Creating symlink: $BINDIR/ollama"
+    $SUDO ln -sf "$OLLAMA_INSTALL_DIR/bin/ollama" "$BINDIR/ollama"
+elif [ -f "$OLLAMA_INSTALL_DIR/ollama" ] && [ ! -f "$BINDIR/ollama" ]; then
     echo "==> Creating symlink: $BINDIR/ollama"
     $SUDO ln -sf "$OLLAMA_INSTALL_DIR/ollama" "$BINDIR/ollama"
 fi
@@ -112,27 +130,27 @@ if [ -n "$ROCM_ARCHIVE" ]; then
     esac
 fi
 
-# ── Configure systemd service (optional) ────────────────────
+# ── Configure systemd service (only for system-wide install) ─
 
-configure_systemd() {
-    if ! command -v systemctl >/dev/null 2>&1; then
-        return
-    fi
-
-    if ! id ollama >/dev/null 2>&1; then
-        echo "==> Creating ollama user..."
-        $SUDO useradd -r -s /bin/false -U -m -d /usr/share/ollama ollama
-    fi
-
-    # Add to GPU groups if they exist
-    for GROUP in render video; do
-        if getent group "$GROUP" >/dev/null 2>&1; then
-            $SUDO usermod -a -G "$GROUP" ollama 2>/dev/null || true
+if [ "$USER_LOCAL" = false ]; then
+    configure_systemd() {
+        if ! command -v systemctl >/dev/null 2>&1; then
+            return
         fi
-    done
 
-    echo "==> Creating ollama systemd service..."
-    cat <<EOF | $SUDO tee /etc/systemd/system/ollama.service >/dev/null
+        if ! id ollama >/dev/null 2>&1; then
+            echo "==> Creating ollama user..."
+            $SUDO useradd -r -s /bin/false -U -m -d /usr/share/ollama ollama
+        fi
+
+        for GROUP in render video; do
+            if getent group "$GROUP" >/dev/null 2>&1; then
+                $SUDO usermod -a -G "$GROUP" ollama 2>/dev/null || true
+            fi
+        done
+
+        echo "==> Creating ollama systemd service..."
+        cat <<EOF | $SUDO tee /etc/systemd/system/ollama.service >/dev/null
 [Unit]
 Description=Ollama Service
 After=network-online.target
@@ -150,20 +168,40 @@ Environment="OLLAMA_HOST=127.0.0.1:11434"
 WantedBy=default.target
 EOF
 
-    SYSTEMCTL_RUNNING="$(systemctl is-system-running 2>/dev/null || true)"
-    case $SYSTEMCTL_RUNNING in
-        running|degraded)
-            echo "==> Enabling ollama service (not starting — use start_server.sh)..."
-            $SUDO systemctl daemon-reload
-            $SUDO systemctl enable ollama
-            ;;
-        *)
-            echo "    NOTE: systemd not running. Use start_server.sh to run Ollama manually."
-            ;;
-    esac
-}
+        SYSTEMCTL_RUNNING="$(systemctl is-system-running 2>/dev/null || true)"
+        case $SYSTEMCTL_RUNNING in
+            running|degraded)
+                echo "==> Enabling ollama service..."
+                $SUDO systemctl daemon-reload
+                $SUDO systemctl enable ollama
+                ;;
+            *)
+                echo "    NOTE: systemd not running. Use start_server.sh to run Ollama manually."
+                ;;
+        esac
+    }
+    configure_systemd
+else
+    echo "==> Skipping systemd setup (user-local install)."
+fi
 
-configure_systemd
+# ── Add to PATH hint ───────────────────────────────────────
+
+if [ "$USER_LOCAL" = true ]; then
+    if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
+        echo ""
+        echo "==> IMPORTANT: Add ~/.local/bin to your PATH."
+        echo "    Run this now and add it to your ~/.bashrc:"
+        echo "      export PATH=\"\$HOME/.local/bin:\$PATH\""
+        echo ""
+        # Add to .bashrc if not already there
+        if ! grep -q 'HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+            echo "    (Added automatically to ~/.bashrc)"
+        fi
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
+fi
 
 # ── Verify installation ────────────────────────────────────
 
@@ -174,7 +212,6 @@ else
     export PATH="$BINDIR:$PATH"
     if command -v ollama >/dev/null 2>&1; then
         echo "==> Ollama installed successfully: $(ollama --version 2>/dev/null || echo 'version unknown')"
-        echo "    NOTE: Add to your PATH: export PATH=$BINDIR:\$PATH"
     else
         echo "ERROR: Ollama binary not found after installation."
         exit 1
@@ -188,6 +225,6 @@ echo "    Binary: $BINDIR/ollama"
 echo ""
 echo "    Next steps:"
 echo "    1. Transfer a model from your local machine:"
-echo "       bash local/transfer_model.sh qwen2.5:14b user@this-server"
+echo "       .\\transfer_model.ps1 -SshTarget user@this-server"
 echo "    2. Start Ollama:"
 echo "       bash start_server.sh"
