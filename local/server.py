@@ -136,6 +136,23 @@ async def _proxy_request(request: Request, url: str) -> Response:
         headers.pop(h, None)
 
     body = await request.body()
+
+    # Rewrite model name to the configured one
+    if body:
+        try:
+            data = json.loads(body)
+            if "model" in data:
+                original = data["model"]
+                data["model"] = settings.model_name
+                body = json.dumps(data).encode()
+                headers["content-length"] = str(len(body))
+                if original != settings.model_name:
+                    logger.info("Request to %s — model: %s → %s", url, original, settings.model_name)
+                else:
+                    logger.info("Request to %s — model: %s", url, original)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+
     is_stream = _is_streaming(body, url)
 
     try:

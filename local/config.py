@@ -2,10 +2,13 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Resolve .env relative to the project root (one level up from local/)
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -28,7 +31,7 @@ class Settings(BaseSettings):
     tunnel_port: int = 11436      # internal port for SSH tunnel → remote Ollama
 
     # ── Model info ──────────────────────────────────────────
-    model_name: str = "qwen2.5:14b"
+    model_name: str = "qwen3-coder:30b"
 
     @property
     def ollama_base_url(self) -> str:

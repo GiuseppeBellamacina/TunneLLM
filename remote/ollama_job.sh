@@ -2,13 +2,12 @@
 #SBATCH --job-name=training
 #SBATCH --output=ollama-%j.log
 #SBATCH --error=ollama-%j.log
-#SBATCH --gres=gpu:1,shard:22528
+#SBATCH --gres=gpu:1 --gres=shard:22528
 #SBATCH --mem=48G
-#SBATCH --cpus-per-task=4
-#SBATCH --time=12:00:00
-# #SBATCH --account=dl-course-q2
-# #SBATCH --partition=dl-course-q2
-# #SBATCH --qos=gpu-xlarge
+#SBATCH --cpus-per-task=8
+#SBATCH --account=dl-course-q2
+#SBATCH --partition=dl-course-q2
+#SBATCH --qos=gpu-xlarge
 
 # ============================================================
 # SLURM Job — Ollama Server on GPU node
@@ -34,13 +33,16 @@
 
 set -euo pipefail
 
-MODEL="${1:-qwen2.5:14b}"
+MODEL="${1:-qwen3-coder:30b}"
 OLLAMA_PORT="${OLLAMA_PORT:-11434}"
 INFO_DIR="$HOME/ollama-server"
 INFO_FILE="$INFO_DIR/node_info.txt"
 
 # Ensure PATH includes user-local install
 export PATH="$HOME/.local/bin:$PATH"
+
+# Disable proxy for local connections (clusters often have http_proxy set)
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
 
 # Ensure Ollama is installed
 if ! command -v ollama >/dev/null 2>&1; then
@@ -87,13 +89,13 @@ OLLAMA_PID=$!
 
 # Wait for Ollama to be ready
 echo "==> Waiting for Ollama to start..."
-for i in $(seq 1 30); do
-    if curl -s "http://localhost:${OLLAMA_PORT}/" >/dev/null 2>&1; then
+for i in $(seq 1 60); do
+    if curl --noproxy '*' -s "http://localhost:${OLLAMA_PORT}/" >/dev/null 2>&1; then
         echo "==> Ollama is ready on ${NODE_NAME}:${OLLAMA_PORT}"
         break
     fi
-    if [ "$i" -eq 30 ]; then
-        echo "ERROR: Ollama failed to start within 30 seconds."
+    if [ "$i" -eq 60 ]; then
+        echo "ERROR: Ollama failed to start within 60 seconds."
         kill $OLLAMA_PID 2>/dev/null || true
         exit 1
     fi

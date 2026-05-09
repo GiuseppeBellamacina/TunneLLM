@@ -1,0 +1,45 @@
+FROM ./Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf
+
+TEMPLATE """{{- if .System }}
+<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}
+{{- if .Tools }}
+<|im_start|>system
+# Tools
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{{- range .Tools }}
+{"type": "function", "function": {{ .Function }}}
+{{- end }}
+</tools>
+
+For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call><|im_end|>
+{{ end }}
+{{- range .Messages }}
+{{- if eq .Role "tool" }}
+<|im_start|>user
+<tool_response>
+{{ .Content }}
+</tool_response><|im_end|>
+{{- else }}
+<|im_start|>{{ .Role }}
+{{ .Content }}
+{{- if .ToolCalls }}
+{{- range .ToolCalls }}
+<tool_call>
+{"name": "{{ .Function.Name }}", "arguments": {{ .Function.Arguments }}}
+</tool_call>
+{{- end }}
+{{- end }}<|im_end|>
+{{- end }}
+{{- end }}
+<|im_start|>assistant
+"""
+
+PARAMETER stop <|im_end|>
+PARAMETER stop <|endoftext|>
