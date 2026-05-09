@@ -18,21 +18,20 @@ class Settings(BaseSettings):
     ssh_password: str | None = None  # only if key is encrypted or no key
     ssh_keepalive: float = 10.0
 
-    # ── Remote vLLM server ──────────────────────────────────
+    # ── Remote Ollama server ────────────────────────────────
     remote_host: str = "127.0.0.1"
-    remote_port: int = 8000
-    vllm_api_key: str = ""
+    remote_port: int = 11434      # Ollama default port on remote
 
     # ── Local proxy ─────────────────────────────────────────
     local_host: str = "127.0.0.1"
-    local_port: int = 11434       # port exposed to VS Code / clients
-    tunnel_port: int = 11435      # internal port for SSH tunnel → remote vLLM
+    local_port: int = 11434       # port exposed to VS Code / Copilot (same as Ollama)
+    tunnel_port: int = 11435      # internal port for SSH tunnel → remote Ollama
 
-    # ── Model info (for /v1/models fallback) ────────────────
-    model_name: str = "Qwen/Qwen2.5-14B-Instruct-AWQ"
+    # ── Model info ──────────────────────────────────────────
+    model_name: str = "qwen2.5:14b"
 
     @property
-    def vllm_base_url(self) -> str:
+    def ollama_base_url(self) -> str:
         return f"http://127.0.0.1:{self.tunnel_port}"
 
 

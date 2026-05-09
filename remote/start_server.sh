@@ -2,33 +2,38 @@
 set -euo pipefail
 
 # ============================================================
-# Start vLLM OpenAI-compatible server
+# Start Ollama server
 # Bound to 127.0.0.1 only (access via SSH tunnel)
 # ============================================================
 
-MODEL_ID="${MODEL_ID:-Qwen/Qwen2.5-14B-Instruct-AWQ}"
-PORT="${VLLM_PORT:-8000}"
-GPU_MEM="${GPU_MEMORY_UTILIZATION:-0.90}"
-MAX_MODEL_LEN="${MAX_MODEL_LEN:-4096}"
-API_KEY="${VLLM_API_KEY:-}"
+MODEL="${MODEL:-qwen2.5:14b}"
+OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"
+export OLLAMA_HOST
 
-CMD=(
-    vllm serve "$MODEL_ID"
-    --host 127.0.0.1
-    --port "$PORT"
-    --dtype auto
-    --gpu-memory-utilization "$GPU_MEM"
-    --max-model-len "$MAX_MODEL_LEN"
-    --trust-remote-code
-)
+echo "==> Starting Ollama server on $OLLAMA_HOST"
+echo "    Model: $MODEL"
 
-if [ -n "$API_KEY" ]; then
-    CMD+=(--api-key "$API_KEY")
-fi
+# Start Ollama serve in background
+ollama serve &
+OLLAMA_PID=$!
 
-echo "==> Starting vLLM server on 127.0.0.1:$PORT"
-echo "    Model: $MODEL_ID"
-echo "    GPU mem utilization: $GPU_MEM"
-echo "    Max model length: $MAX_MODEL_LEN"
+# Wait for Ollama to be ready
+echo "==> Waiting for Ollama to start..."
+for i in $(seq 1 30); do
+    if curl -s "http://$OLLAMA_HOST/" >/dev/null 2>&1; then
+        echo "==> Ollama is ready."
+        break
+    fi
+    sleep 1
+done
 
-exec "${CMD[@]}"
+# Load the model (keep it warm in memory)
+echo "==> Loading model: $MODEL"
+ollama run "$MODEL" "" 2>/dev/null || true
+
+echo "==> Model loaded. Ollama is serving on $OLLAMA_HOST"
+echo "    PID: $OLLAMA_PID"
+echo "    Stop with: kill $OLLAMA_PID"
+
+# Keep in foreground
+wait $OLLAMA_PID

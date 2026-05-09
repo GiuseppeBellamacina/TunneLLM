@@ -11,7 +11,7 @@ from tunnel import tunnel_manager
 
 logger = logging.getLogger(__name__)
 
-VLLM_BASE = f"http://127.0.0.1:{settings.tunnel_port}"
+OLLAMA_BASE = f"http://127.0.0.1:{settings.tunnel_port}"
 TIMEOUT = httpx.Timeout(connect=10.0, read=300.0, write=10.0, pool=10.0)
 
 
@@ -22,7 +22,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     tunnel_manager.stop()
 
 
-app = FastAPI(title="Abusive-LLM Proxy", lifespan=lifespan)
+app = FastAPI(title="TunneLLM Proxy", lifespan=lifespan)
 
 # Shared async HTTP client — reuses connections
 _client: httpx.AsyncClient | None = None
@@ -31,15 +31,29 @@ _client: httpx.AsyncClient | None = None
 async def get_client() -> httpx.AsyncClient:
     global _client
     if _client is None or _client.is_closed:
-        headers = {}
-        if settings.vllm_api_key:
-            headers["Authorization"] = f"Bearer {settings.vllm_api_key}"
         _client = httpx.AsyncClient(
-            base_url=VLLM_BASE,
+            base_url=OLLAMA_BASE,
             timeout=TIMEOUT,
-            headers=headers,
         )
     return _client
+
+
+# ── Ollama root endpoint ───────────────────────────────────
+
+
+@app.get("/")
+async def root() -> Response:
+    """Ollama returns 'Ollama is running' on GET /."""
+    try:
+        client = await get_client()
+        resp = await client.get("/")
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=resp.headers.get("content-type"),
+        )
+    except Exception:
+        return Response(content=b"Ollama is running", status_code=200)
 
 
 # ── Health ──────────────────────────────────────────────────
@@ -48,40 +62,56 @@ async def get_client() -> httpx.AsyncClient:
 @app.get("/health")
 async def health() -> dict:
     tunnel_ok = tunnel_manager.is_active
-    vllm_ok = False
+    ollama_ok = False
     if tunnel_ok:
         try:
             client = await get_client()
-            resp = await client.get("/v1/models")
-            vllm_ok = resp.status_code == 200
+            resp = await client.get("/api/tags")
+            ollama_ok = resp.status_code == 200
         except Exception:
             pass
     return {
         "tunnel": "up" if tunnel_ok else "down",
-        "vllm": "up" if vllm_ok else "down",
+        "ollama": "up" if ollama_ok else "down",
         "model": settings.model_name,
     }
 
 
-# ── Proxy all /v1/* requests ────────────────────────────────
+# ── Proxy all Ollama API requests (/api/*) ──────────────────
+
+
+@app.api_route(
+    "/api/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+)
+async def proxy_ollama_api(request: Request, path: str) -> Response:
+    return await _proxy_request(request, f"/api/{path}")
+
+
+# ── Proxy OpenAI-compatible requests (/v1/*) ────────────────
 
 
 @app.api_route(
     "/v1/{path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
 )
-async def proxy_vllm(request: Request, path: str) -> Response:
+async def proxy_openai_api(request: Request, path: str) -> Response:
+    return await _proxy_request(request, f"/v1/{path}")
+
+
+# ── Core proxy logic ────────────────────────────────────────
+
+
+async def _proxy_request(request: Request, url: str) -> Response:
     client = await get_client()
-    url = f"/v1/{path}"
 
     headers = dict(request.headers)
-    # Remove hop-by-hop headers
     for h in ("host", "transfer-encoding"):
         headers.pop(h, None)
 
     body = await request.body()
 
-    # Detect if the caller wants streaming
+    # Detect streaming (Ollama uses "stream":true in JSON body)
     is_stream = b'"stream":true' in body or b'"stream": true' in body
 
     try:
@@ -121,15 +151,15 @@ async def proxy_vllm(request: Request, path: str) -> Response:
                 media_type=resp.headers.get("content-type"),
             )
     except httpx.ConnectError:
-        logger.error("Cannot reach vLLM via tunnel at %s", VLLM_BASE)
+        logger.error("Cannot reach Ollama via tunnel at %s", OLLAMA_BASE)
         return Response(
-            content=b'{"error":"Cannot reach vLLM server. Check tunnel."}',
+            content=b'{"error":"Cannot reach Ollama server. Check tunnel."}',
             status_code=502,
             media_type="application/json",
         )
     except httpx.ReadTimeout:
         return Response(
-            content=b'{"error":"vLLM read timeout (model may be loading)."}',
+            content=b'{"error":"Ollama read timeout (model may be loading)."}',
             status_code=504,
             media_type="application/json",
         )

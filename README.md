@@ -1,66 +1,95 @@
-# Abusive-LLM
+# TunneLLM
 
-Self-hosted LLM API via SSH tunnel. Serve un modello LLM su un server GPU remoto (vLLM) e lo espone localmente come API OpenAI-compatible per VS Code (Continue / Copilot).
+Usa un modello LLM hostato su un server remoto (Ollama) come se fosse il tuo Ollama locale. Pensato per server raggiungibili **solo via SSH** (senza rete tradizionale). VS Code Copilot si connette al proxy locale che inoltra tutto al server remoto tramite tunnel SSH.
 
 ## Architettura
 
 ```
-[VS Code: Continue / Copilot]
-        │  http://localhost:11434/v1
+[VS Code Copilot / qualsiasi client Ollama]
+        │  http://localhost:11434 (Ollama API)
         ▼
 [Local: FastAPI Proxy (porta 11434)]
         │  httpx → localhost:11435
         ▼
-[SSH Tunnel (porta 11435 → remote:8000)]
+[SSH Tunnel (porta 11435 → remote:11434)]
         │  sshtunnel / paramiko
         ▼
-[Remote: vLLM Server (porta 8000)]
-        │  GPU 22GB VRAM
+[Remote: Ollama (porta 11434)]
+        │  GPU
         ▼
-[Qwen2.5-14B-Instruct-AWQ (~9GB 4-bit)]
+[Modello: qwen2.5:14b (o qualsiasi altro)]
 ```
 
 ## Setup
 
-### 1. Server remoto (GPU)
+### 1. Server remoto (GPU) — Installazione Ollama
 
-Copia la cartella `remote/` sul server:
-
-```bash
-scp -r remote/ user@server:~/abusive-llm/
-```
-
-Sul server:
+#### Con internet sul server
 
 ```bash
-cd ~/abusive-llm
-bash setup.sh          # installa vLLM + scarica modello
-bash start_server.sh   # avvia vLLM su 127.0.0.1:8000
+scp -r remote/ user@server:~/ollama-server/
+ssh user@server
+cd ~/ollama-server
+bash setup.sh
+ollama pull qwen2.5:14b
 ```
 
-> Se il server non ha accesso a HuggingFace, scarica il modello localmente e trasferiscilo via SCP:
->
-> ```bash
-> # locale
-> huggingface-cli download Qwen/Qwen2.5-14B-Instruct-AWQ --local-dir ./model
-> scp -r ./model user@server:~/.cache/huggingface/hub/models--Qwen--Qwen2.5-14B-Instruct-AWQ/
-> ```
+#### Senza internet (solo SSH)
 
-### 2. Macchina locale
+Dal tuo PC locale:
+
+```bash
+# 1. Scarica il binario di Ollama
+curl -fsSL https://ollama.com/download/ollama-linux-amd64.tgz -o ollama.tgz
+
+# 2. Trasferisci via SCP
+scp ollama.tgz user@server:~/
+scp -r remote/ user@server:~/ollama-server/
+
+# 3. Installa sul server
+ssh user@server
+cd ~/ollama-server
+OLLAMA_TGZ=~/ollama.tgz bash setup.sh
+```
+
+#### Trasferire un modello offline
+
+Dal tuo PC locale (con Ollama installato):
+
+```bash
+# Scarica il modello localmente
+ollama pull qwen2.5:14b
+
+# Trasferisci al server
+cd local
+.\transfer_model.ps1 -SshTarget "user@server"
+```
+
+### 2. Avviare Ollama sul server
+
+```bash
+ssh user@server
+cd ~/ollama-server
+bash start_server.sh
+# oppure con un modello diverso:
+MODEL=llama3:8b bash start_server.sh
+```
+
+### 3. Macchina locale
 
 ```bash
 cd local/
 pip install -r requirements.txt
-cp ../.env.example ../.env
+cp ../.env.example .env   # se presente
 # Edita .env con i dati SSH del tuo server
 ```
 
 Verifica che il tunnel SSH funzioni:
 
 ```bash
-ssh -N -L 11435:127.0.0.1:8000 user@server
+ssh -N -L 11435:127.0.0.1:11434 user@server
 # In un altro terminale:
-curl http://localhost:11435/v1/models
+curl http://localhost:11435/api/tags
 ```
 
 Se funziona, avvia il proxy:
@@ -70,33 +99,19 @@ cd local/
 python main.py
 ```
 
-### 3. VS Code — Continue Extension
+> **Nota:** Se hai Ollama locale in esecuzione sulla porta 11434, fermalo prima (`ollama stop` o `systemctl stop ollama`) oppure cambia `LOCAL_PORT` nel `.env`.
 
-Installa [Continue](https://marketplace.visualstudio.com/items?itemName=Continue.continue) e configura `.continue/config.yaml`:
+### 4. VS Code — Copilot
 
-```yaml
-name: Abusive-LLM
-version: 0.0.1
-schema: v1
-models:
-  - name: Qwen2.5-14B
-    provider: openai
-    model: Qwen/Qwen2.5-14B-Instruct-AWQ
-    apiBase: http://localhost:11434/v1
-    apiKey: dummy
-```
-
-### 4. VS Code — Copilot Custom Models (sperimentale)
-
-In `settings.json`:
+In VS Code `settings.json`:
 
 ```json
 {
   "github.copilot.chat.models": [
     {
       "family": "gpt-4o",
-      "id": "Qwen/Qwen2.5-14B-Instruct-AWQ",
-      "name": "Qwen2.5-14B (self-hosted)",
+      "id": "qwen2.5:14b",
+      "name": "Qwen2.5-14B (remote via TunneLLM)",
       "url": "http://localhost:11434",
       "isDefault": false
     }
@@ -104,33 +119,50 @@ In `settings.json`:
 }
 ```
 
+Oppure, se Copilot supporta provider Ollama:
+
+```json
+{
+  "github.copilot.chat.models.ollama.url": "http://localhost:11434"
+}
+```
+
 ## Endpoints
 
-| Endpoint               | Metodo | Descrizione                             |
-| ---------------------- | ------ | --------------------------------------- |
-| `/health`              | GET    | Stato tunnel SSH + vLLM                 |
-| `/v1/models`           | GET    | Lista modelli disponibili               |
-| `/v1/chat/completions` | POST   | Chat completions (streaming supportato) |
-| `/v1/completions`      | POST   | Text completions                        |
+Il proxy inoltra tutte le richieste Ollama al server remoto:
+
+| Endpoint               | Metodo | Descrizione                     |
+| ---------------------- | ------ | ------------------------------- |
+| `/`                    | GET    | "Ollama is running"             |
+| `/health`              | GET    | Stato tunnel SSH + Ollama       |
+| `/api/tags`            | GET    | Lista modelli (= `ollama list`) |
+| `/api/chat`            | POST   | Chat completions                |
+| `/api/generate`        | POST   | Text generation                 |
+| `/api/embeddings`      | POST   | Embeddings                      |
+| `/api/show`            | POST   | Info modello                    |
+| `/api/ps`              | GET    | Modelli in esecuzione           |
+| `/v1/chat/completions` | POST   | OpenAI-compatible chat          |
+| `/v1/models`           | GET    | OpenAI-compatible model list    |
 
 ## Configurazione
 
-Tutte le variabili sono in `.env` (vedi `.env.example`). Override via environment variables.
+Tutte le variabili sono in `.env`. Override via environment variables.
 
-| Variabile      | Default                         | Descrizione                            |
-| -------------- | ------------------------------- | -------------------------------------- |
-| `SSH_HOST`     | `localhost`                     | Hostname del server GPU                |
-| `SSH_PORT`     | `22`                            | Porta SSH                              |
-| `SSH_USER`     | `root`                          | Username SSH                           |
-| `SSH_KEY_PATH` | `~/.ssh/id_rsa`                 | Path alla chiave privata SSH           |
-| `LOCAL_PORT`   | `11434`                         | Porta pubblica del proxy (per VS Code) |
-| `TUNNEL_PORT`  | `11435`                         | Porta interna del tunnel SSH           |
-| `REMOTE_PORT`  | `8000`                          | Porta vLLM sul server remoto           |
-| `MODEL_NAME`   | `Qwen/Qwen2.5-14B-Instruct-AWQ` | Nome modello                           |
+| Variabile      | Default         | Descrizione                      |
+| -------------- | --------------- | -------------------------------- |
+| `SSH_HOST`     | `localhost`     | Hostname del server GPU          |
+| `SSH_PORT`     | `22`            | Porta SSH                        |
+| `SSH_USER`     | `root`          | Username SSH                     |
+| `SSH_KEY_PATH` | `~/.ssh/id_rsa` | Path alla chiave privata SSH     |
+| `LOCAL_PORT`   | `11434`         | Porta del proxy (= porta Ollama) |
+| `TUNNEL_PORT`  | `11435`         | Porta interna del tunnel SSH     |
+| `REMOTE_PORT`  | `11434`         | Porta Ollama sul server remoto   |
+| `MODEL_NAME`   | `qwen2.5:14b`   | Nome modello                     |
 
 ## Troubleshooting
 
-- **`/health` dice tunnel: down`:** Verifica SSH credentials in `.env` e che il server sia raggiungibile
-- **`/health` dice vllm: down`:** vLLM non è avviato sul server. SSH nel server e controlla `bash start_server.sh`
-- **Timeout sulle risposte:** Il modello potrebbe essere in fase di caricamento (prima richiesta dopo l'avvio). Aspetta ~30s
-- **Out of memory sul server:** Riduci `MAX_MODEL_LEN` o `GPU_MEMORY_UTILIZATION` in `start_server.sh`
+- **`/health` dice `tunnel: down`:** Verifica SSH credentials in `.env` e che il server sia raggiungibile via SSH
+- **`/health` dice `ollama: down`:** Ollama non è avviato sul server. SSH nel server e controlla `bash start_server.sh`
+- **Conflitto porta 11434:** Se hai Ollama locale, fermalo o cambia `LOCAL_PORT`
+- **Timeout sulle risposte:** Il modello potrebbe essere in fase di caricamento (prima richiesta). Aspetta ~30s
+- **Modello non trovato:** Assicurati che il modello sia stato pullato/trasferito sul server: `ssh user@server "ollama list"`

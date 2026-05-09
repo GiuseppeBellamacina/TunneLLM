@@ -16,10 +16,11 @@ logging.basicConfig(
 
 
 def main() -> None:
-    print(f"Starting Abusive-LLM proxy on {settings.local_host}:{settings.local_port}")
+    print(f"Starting TunneLLM proxy on {settings.local_host}:{settings.local_port}")
     print(f"  SSH tunnel port: {settings.tunnel_port} → {settings.remote_host}:{settings.remote_port}")
     print(f"  SSH target: {settings.ssh_user}@{settings.ssh_host}:{settings.ssh_port}")
     print(f"  Model: {settings.model_name}")
+    print(f"  VS Code Copilot → http://{settings.local_host}:{settings.local_port}")
     print()
 
     uvicorn.run(
