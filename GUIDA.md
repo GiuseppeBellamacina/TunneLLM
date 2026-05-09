@@ -160,6 +160,55 @@ cd C:\Users\TUO_UTENTE\Codici\TunneLLM\local
 
 > **Nota:** Questo trasferimento può richiedere molto tempo per modelli grandi (10+ GB). Assicurati di avere una connessione SSH stabile.
 
+### Alternativa: Scaricare un modello GGUF da HuggingFace
+
+Se il server **ha accesso a internet** (es. può raggiungere huggingface.co), puoi scaricare un modello GGUF direttamente sul server senza trasferirlo dal tuo PC.
+
+1. **Trova il modello su HuggingFace** — cerca un file `.gguf` (es. [Qwen3-Coder-30B-A3B](https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF))
+
+2. **Scaricalo direttamente sul server:**
+
+```bash
+ssh user@server
+cd ~/ollama-server
+
+# Usa il link "resolve" (non "blob") per il download diretto
+wget https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf
+```
+
+3. **Crea un Modelfile** che dice a Ollama di usare quel GGUF:
+
+```bash
+cat > Modelfile <<'EOF'
+FROM ./Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf
+EOF
+```
+
+4. **Importa il modello in Ollama** (serve il server attivo):
+
+```bash
+# Avvia Ollama temporaneamente
+ollama serve &
+sleep 2
+
+# Importa con il nome che vuoi
+ollama create qwen3-coder:30b -f Modelfile
+
+# Verifica
+ollama list
+
+# Ferma il server
+kill %1
+```
+
+5. **Pulizia** — dopo il `create`, Ollama copia il GGUF nei suoi blob. Puoi eliminare il file originale:
+
+```bash
+rm Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf Modelfile
+```
+
+> **Nota:** Il nome che dai al `create` (es. `qwen3-coder:30b`) è quello che userai in `MODEL_NAME` nel `.env`.
+
 ---
 
 ## Passo 6: Avvia Ollama sul server
