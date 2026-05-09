@@ -36,7 +36,6 @@ VS Code Copilot parla con il proxy locale sulla porta 11434 (la stessa porta di 
 Apri un terminale PowerShell e clona il repository:
 
 ```powershell
-cd C:\Users\TUO_UTENTE\Codici   # o dove preferisci
 git clone https://github.com/GiuseppeBellamacina/TunneLLM.git
 cd TunneLLM
 ```
@@ -185,9 +184,37 @@ bash start_server.sh
 > # Per riattaccarti: screen -r ollama
 > ```
 
-### Caso B: Cluster con SLURM (es. cluster DMI UniCT)
+### Caso B: Cluster con SLURM
 
 Su un cluster SLURM le GPU sono disponibili **solo dentro un job**. Non puoi avviare Ollama direttamente sul login node.
+
+#### 6b.0. Trasferisci gli script sul cluster
+
+Dal tuo PC, copia la cartella `remote/` sul cluster (contiene `setup.sh`, `start_server.sh`, `ollama_job.sh`):
+
+```powershell
+# Crea la cartella sul cluster
+ssh user@server "mkdir -p ~/ollama-server"
+
+# Copia tutti gli script
+scp -r remote\* user@server:~/ollama-server/
+```
+
+> Se il server usa una porta SSH diversa:
+>
+> ```powershell
+> ssh -p 2222 user@server "mkdir -p ~/ollama-server"
+> scp -P 2222 -r remote\* user@server:~/ollama-server/
+> ```
+
+Dopo questo comando, sul cluster avrai:
+
+```
+~/ollama-server/
+├── setup.sh            # installazione Ollama
+├── start_server.sh     # avvio standalone
+└── ollama_job.sh       # avvio via SLURM
+```
 
 #### 6b.1. Modifica le direttive SLURM
 

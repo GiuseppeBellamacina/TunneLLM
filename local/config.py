@@ -24,8 +24,8 @@ class Settings(BaseSettings):
 
     # ── Local proxy ─────────────────────────────────────────
     local_host: str = "127.0.0.1"
-    local_port: int = 11434       # port exposed to VS Code / Copilot (same as Ollama)
-    tunnel_port: int = 11435      # internal port for SSH tunnel → remote Ollama
+    local_port: int = 11435       # port exposed to VS Code / Copilot
+    tunnel_port: int = 11436      # internal port for SSH tunnel → remote Ollama
 
     # ── Model info ──────────────────────────────────────────
     model_name: str = "qwen2.5:14b"

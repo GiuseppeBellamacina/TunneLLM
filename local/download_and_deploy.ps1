@@ -22,6 +22,9 @@
 .PARAMETER RemoteDir
     Remote directory to upload files to (default: ~/ollama-server)
 
+.PARAMETER SkipDownload
+    If set, skips downloading Ollama and uses the existing archive in ollama-download/
+
 .PARAMETER SkipInstall
     If set, only downloads and transfers files without running the installer
 
@@ -31,6 +34,7 @@
 .EXAMPLE
     .\download_and_deploy.ps1 -SshTarget "user@server"
     .\download_and_deploy.ps1 -SshTarget "user@server" -Arch arm64
+    .\download_and_deploy.ps1 -SshTarget "user@server" -SkipDownload
     .\download_and_deploy.ps1 -SshTarget "user@server" -SkipInstall
 #>
 
@@ -44,6 +48,8 @@ param(
     [int]$SshPort = 22,
 
     [string]$RemoteDir = "~/ollama-server",
+
+    [switch]$SkipDownload,
 
     [switch]$SkipInstall,
 
@@ -95,41 +101,55 @@ if (-not (Test-Path $DownloadDir)) {
     New-Item -ItemType Directory -Path $DownloadDir | Out-Null
 }
 
-# Try .tar.zst first, fall back to .tgz
 $archiveFile = $null
-$zstUrl = "$BaseUrl/ollama-linux-${Arch}.tar.zst"
-$tgzUrl = "$BaseUrl/ollama-linux-${Arch}.tgz"
 
-Write-Host ">>> Checking for .tar.zst archive..." -ForegroundColor Cyan
-if (Test-UrlExists $zstUrl) {
-    $archiveFile = Join-Path $DownloadDir "ollama-linux-${Arch}.tar.zst"
-    Download-File -Url $zstUrl -OutFile $archiveFile
-    Write-Host "    NOTE: The server needs 'zstd' to extract this. If not available, re-run or use .tgz." -ForegroundColor Yellow
-} else {
-    Write-Host "    .tar.zst not available, falling back to .tgz" -ForegroundColor Yellow
-    $archiveFile = Join-Path $DownloadDir "ollama-linux-${Arch}.tgz"
-    Download-File -Url $tgzUrl -OutFile $archiveFile
-}
-
-# Optionally download ROCm (AMD GPU) package
-if ($IncludeROCm) {
-    $rocmFile = Join-Path $DownloadDir "ollama-linux-${Arch}-rocm.tar.zst"
-    $rocmUrl = "$BaseUrl/ollama-linux-${Arch}-rocm.tar.zst"
-    
-    if (Test-UrlExists $rocmUrl) {
-        Download-File -Url $rocmUrl -OutFile $rocmFile
+if ($SkipDownload) {
+    # Use existing archive
+    Write-Host ">>> Skipping download, looking for existing archive..." -ForegroundColor Cyan
+    $existing = Get-ChildItem $DownloadDir -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "ollama-linux-${Arch}.*" -and $_.Name -notlike "*-rocm*" } | Select-Object -First 1
+    if ($existing) {
+        $archiveFile = $existing.FullName
+        $sizeMB = [math]::Round($existing.Length / 1MB, 1)
+        Write-Host "    Found: $($existing.Name)  ($sizeMB MB)" -ForegroundColor Green
     } else {
-        $rocmTgz = "$BaseUrl/ollama-linux-${Arch}-rocm.tgz"
-        $rocmFile = Join-Path $DownloadDir "ollama-linux-${Arch}-rocm.tgz"
-        Download-File -Url $rocmTgz -OutFile $rocmFile
+        Write-Error "No existing archive found in $DownloadDir for arch '$Arch'. Run without -SkipDownload first."
     }
-}
+} else {
+    # Try .tar.zst first, fall back to .tgz
+    $zstUrl = "$BaseUrl/ollama-linux-${Arch}.tar.zst"
+    $tgzUrl = "$BaseUrl/ollama-linux-${Arch}.tgz"
 
-Write-Host ""
-Write-Host ">>> Download complete. Files in: $DownloadDir" -ForegroundColor Green
-Get-ChildItem $DownloadDir | ForEach-Object {
-    $sizeMB = [math]::Round($_.Length / 1MB, 1)
-    Write-Host "    $($_.Name)  ($sizeMB MB)"
+    Write-Host ">>> Checking for .tar.zst archive..." -ForegroundColor Cyan
+    if (Test-UrlExists $zstUrl) {
+        $archiveFile = Join-Path $DownloadDir "ollama-linux-${Arch}.tar.zst"
+        Download-File -Url $zstUrl -OutFile $archiveFile
+        Write-Host "    NOTE: The server needs 'zstd' to extract this. If not available, re-run or use .tgz." -ForegroundColor Yellow
+    } else {
+        Write-Host "    .tar.zst not available, falling back to .tgz" -ForegroundColor Yellow
+        $archiveFile = Join-Path $DownloadDir "ollama-linux-${Arch}.tgz"
+        Download-File -Url $tgzUrl -OutFile $archiveFile
+    }
+
+    # Optionally download ROCm (AMD GPU) package
+    if ($IncludeROCm) {
+        $rocmFile = Join-Path $DownloadDir "ollama-linux-${Arch}-rocm.tar.zst"
+        $rocmUrl = "$BaseUrl/ollama-linux-${Arch}-rocm.tar.zst"
+        
+        if (Test-UrlExists $rocmUrl) {
+            Download-File -Url $rocmUrl -OutFile $rocmFile
+        } else {
+            $rocmTgz = "$BaseUrl/ollama-linux-${Arch}-rocm.tgz"
+            $rocmFile = Join-Path $DownloadDir "ollama-linux-${Arch}-rocm.tgz"
+            Download-File -Url $rocmTgz -OutFile $rocmFile
+        }
+    }
+
+    Write-Host ""
+    Write-Host ">>> Download complete. Files in: $DownloadDir" -ForegroundColor Green
+    Get-ChildItem $DownloadDir | ForEach-Object {
+        $sizeMB = [math]::Round($_.Length / 1MB, 1)
+        Write-Host "    $($_.Name)  ($sizeMB MB)"
+    }
 }
 
 # ── Transfer to server via SCP ──────────────────────────────

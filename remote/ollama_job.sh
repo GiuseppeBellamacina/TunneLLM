@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=ollama
+#SBATCH --job-name=training
 #SBATCH --output=ollama-%j.log
 #SBATCH --error=ollama-%j.log
 #SBATCH --gres=gpu:1,shard:22528

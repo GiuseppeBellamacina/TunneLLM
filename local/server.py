@@ -1,3 +1,4 @@
+import json
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
@@ -101,6 +102,31 @@ async def proxy_openai_api(request: Request, path: str) -> Response:
 
 # ── Core proxy logic ────────────────────────────────────────
 
+# Ollama API endpoints that stream by default (when "stream" is not explicitly set)
+_OLLAMA_STREAM_ENDPOINTS = {"/api/generate", "/api/chat", "/api/embed"}
+
+
+def _is_streaming(body: bytes, url: str) -> bool:
+    """Detect if the request will produce a streaming response.
+
+    Ollama behavior:
+    - /api/generate, /api/chat: stream=true by DEFAULT (must send stream:false to disable)
+    - /v1/chat/completions: stream=false by default (OpenAI convention)
+    - Other endpoints: no streaming
+    """
+    if not body:
+        return url in _OLLAMA_STREAM_ENDPOINTS
+
+    try:
+        data = json.loads(body)
+        stream_value = data.get("stream")
+        if stream_value is not None:
+            return bool(stream_value)
+        # No explicit "stream" field → use endpoint default
+        return url in _OLLAMA_STREAM_ENDPOINTS
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return False
+
 
 async def _proxy_request(request: Request, url: str) -> Response:
     client = await get_client()
@@ -110,9 +136,7 @@ async def _proxy_request(request: Request, url: str) -> Response:
         headers.pop(h, None)
 
     body = await request.body()
-
-    # Detect streaming (Ollama uses "stream":true in JSON body)
-    is_stream = b'"stream":true' in body or b'"stream": true' in body
+    is_stream = _is_streaming(body, url)
 
     try:
         if is_stream:
