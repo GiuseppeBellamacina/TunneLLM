@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     tunnel_port: int = 11435  # internal port for SSH tunnel → remote Ollama
 
     # ── Model info ──────────────────────────────────────────
-    model_name: str = "qwen3.6:35b"
+    model_name: str = "qwen3-coder:30b"
 
     # ── Retry / resilience ──────────────────────────────────
     max_retries: int = 3

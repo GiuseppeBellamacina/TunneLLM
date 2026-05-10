@@ -185,27 +185,27 @@ Oppure, se Copilot supporta provider Ollama:
 
 Tutte le variabili sono in `.env`. Override via environment variables.
 
-| Variabile                    | Default         | Descrizione                          |
-| ---------------------------- | --------------- | ------------------------------------ |
-| `SSH_HOST`                   | `localhost`     | Hostname del server GPU              |
-| `SSH_PORT`                   | `22`            | Porta SSH                            |
-| `SSH_USER`                   | `root`          | Username SSH                         |
-| `SSH_KEY_PATH`               | `~/.ssh/id_rsa` | Path alla chiave privata SSH         |
-| `SSH_PASSWORD`               | —               | Password SSH (se chiave protetta)    |
-| `SSH_KEEPALIVE`              | `10.0`          | Intervallo keepalive SSH (sec)       |
-| `LOCAL_PORT`                 | `11434`         | Porta del proxy                      |
-| `TUNNEL_PORT`                | `11435`         | Porta interna del tunnel SSH         |
-| `REMOTE_HOST`                | `127.0.0.1`     | Host remoto (per SLURM: nodo GPU)    |
-| `REMOTE_PORT`                | `11434`         | Porta Ollama sul server remoto       |
-| `MODEL_NAME`                 | `qwen3.6:35b`   | Nome modello di default              |
-| `MAX_RETRIES`                | `3`             | Tentativi di retry per richiesta     |
-| `RETRY_BASE_DELAY`           | `1.0`           | Delay base per backoff (sec)         |
-| `MAX_CONCURRENT_INFERENCES`  | `4`             | Max richieste di inferenza in volo   |
-| `CONNECT_TIMEOUT`            | `10.0`          | Timeout connessione HTTP (sec)       |
-| `READ_TIMEOUT`               | `600.0`         | Timeout lettura HTTP (sec)           |
-| `WRITE_TIMEOUT`              | `10.0`          | Timeout scrittura HTTP (sec)         |
-| `TUNNEL_CHECK_INTERVAL`      | `5.0`           | Intervallo health check tunnel (sec) |
-| `TUNNEL_MAX_RECONNECT_DELAY` | `30.0`          | Cap backoff per riconnessione (sec)  |
+| Variabile                    | Default           | Descrizione                          |
+| ---------------------------- | ----------------- | ------------------------------------ |
+| `SSH_HOST`                   | `localhost`       | Hostname del server GPU              |
+| `SSH_PORT`                   | `22`              | Porta SSH                            |
+| `SSH_USER`                   | `root`            | Username SSH                         |
+| `SSH_KEY_PATH`               | `~/.ssh/id_rsa`   | Path alla chiave privata SSH         |
+| `SSH_PASSWORD`               | —                 | Password SSH (se chiave protetta)    |
+| `SSH_KEEPALIVE`              | `10.0`            | Intervallo keepalive SSH (sec)       |
+| `LOCAL_PORT`                 | `11434`           | Porta del proxy                      |
+| `TUNNEL_PORT`                | `11435`           | Porta interna del tunnel SSH         |
+| `REMOTE_HOST`                | `127.0.0.1`       | Host remoto (per SLURM: nodo GPU)    |
+| `REMOTE_PORT`                | `11434`           | Porta Ollama sul server remoto       |
+| `MODEL_NAME`                 | `qwen3-coder:30b` | Nome modello di default              |
+| `MAX_RETRIES`                | `3`               | Tentativi di retry per richiesta     |
+| `RETRY_BASE_DELAY`           | `1.0`             | Delay base per backoff (sec)         |
+| `MAX_CONCURRENT_INFERENCES`  | `4`               | Max richieste di inferenza in volo   |
+| `CONNECT_TIMEOUT`            | `10.0`            | Timeout connessione HTTP (sec)       |
+| `READ_TIMEOUT`               | `600.0`           | Timeout lettura HTTP (sec)           |
+| `WRITE_TIMEOUT`              | `10.0`            | Timeout scrittura HTTP (sec)         |
+| `TUNNEL_CHECK_INTERVAL`      | `5.0`             | Intervallo health check tunnel (sec) |
+| `TUNNEL_MAX_RECONNECT_DELAY` | `30.0`            | Cap backoff per riconnessione (sec)  |
 
 ### Multi-model
 
@@ -248,7 +248,7 @@ Risposta di esempio:
   "total_completion_tokens": 8400,
   "recent": [
     {
-      "model": "qwen3.6:35b",
+      "model": "qwen3-coder:30b",
       "endpoint": "/v1/chat/completions",
       "latency_s": 2.84,
       "first_token_s": 0.31,
@@ -274,7 +274,7 @@ Risposta di esempio:
 
 ### Benchmark di riferimento
 
-Valori indicativi con Qwen3.6:35B (Q4_K_S) su diverse GPU:
+Valori indicativi con Qwen3-coder:30B (Q4_KS) su diverse GPU:
 
 | GPU       | VRAM  | tokens/sec | TTFT  |
 | --------- | ----- | ---------- | ----- |

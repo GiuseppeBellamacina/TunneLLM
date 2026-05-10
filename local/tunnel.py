@@ -1,9 +1,8 @@
 import logging
 import threading
 
-from sshtunnel import SSHTunnelForwarder
-
 from config import settings
+from sshtunnel import SSHTunnelForwarder
 
 logger = logging.getLogger(__name__)
 

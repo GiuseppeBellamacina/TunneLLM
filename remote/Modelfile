@@ -1,7 +1,8 @@
-FROM ./Qwen3.6-35B-A3B-UD-Q4_K_S.gguf
+FROM ./Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf
 
-RENDERER qwen3-coder
 PARSER qwen3-coder
+RENDERER qwen3-coder
+
 PARAMETER repeat_penalty 1.05
 PARAMETER stop <|im_start|>
 PARAMETER stop <|im_end|>
@@ -50,6 +51,3 @@ For each function call, return a json object with function name and arguments wi
 {{- end }}
 <|im_start|>assistant
 """
-
-PARAMETER stop <|im_end|>
-PARAMETER stop <|endoftext|>

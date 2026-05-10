@@ -5,7 +5,6 @@ import logging
 import sys
 
 import uvicorn
-
 from config import settings
 
 logging.basicConfig(

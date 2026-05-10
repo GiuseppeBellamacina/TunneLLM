@@ -8,11 +8,10 @@ from pathlib import Path
 from typing import AsyncIterator
 
 import httpx
+from config import settings
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
-
-from config import settings
 from metrics import RequestMetric, metrics
 from request_log import request_log
 from tunnel import tunnel_manager
