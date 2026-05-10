@@ -351,16 +351,16 @@
         padding: 12px 14px;
         white-space: pre-wrap;
         word-break: break-word;
-        max-height: 200px;
         overflow-y: auto;
         position: relative;
-        transition: max-height 0.3s ease;
-      }
-      .msg-body.expanded {
-        max-height: none;
       }
       .msg-body.collapsed {
-        max-height: 200px;
+        display: none;
+      }
+      .msg-body.expanded {
+        display: block;
+        max-height: 600px;
+        overflow-y: auto;
       }
       .msg-body::-webkit-scrollbar {
         width: 4px;
@@ -747,7 +747,13 @@
 
       function App() {
         const [tab, setTab] = useState("requests");
+        const [requestsKey, setRequestsKey] = useState(0);
         const [health, setHealth] = useState(null);
+
+        const handleTabClick = (id) => {
+          if (id === "requests") setRequestsKey((k) => k + 1);
+          setTab(id);
+        };
 
         useEffect(() => {
           const poll = () =>
@@ -756,7 +762,7 @@
               .then(setHealth)
               .catch(() => {});
           poll();
-          const id = setInterval(poll, 5000);
+          const id = setInterval(poll, 15000);
           return () => clearInterval(id);
         }, []);
 
@@ -789,7 +795,7 @@
                   <div
                     key={t.id}
                     className={`nav-item ${tab === t.id ? "active" : ""}`}
-                    onClick={() => setTab(t.id)}
+                    onClick={() => handleTabClick(t.id)}
                   >
                     {t.icon}
                     {t.label}
@@ -798,7 +804,7 @@
               </div>
             </div>
             <div className="main">
-              {tab === "requests" && <RequestsTab />}
+              {tab === "requests" && <RequestsTab key={requestsKey} />}
               {tab === "metrics" && <MetricsTab />}
               {tab === "settings" && <SettingsTab />}
             </div>
@@ -829,7 +835,7 @@
         }, [load]);
         useEffect(() => {
           if (!auto) return;
-          const id = setInterval(load, 2000);
+          const id = setInterval(load, 10000);
           return () => clearInterval(id);
         }, [auto, load]);
 
@@ -878,24 +884,30 @@
                 ))}
               </div>
               <div style={{ flex: 1 }}></div>
-              <label
+              <button
+                className={`btn btn-sm`}
+                onClick={() => setAuto(!auto)}
                 style={{
-                  fontSize: 12,
-                  color: "var(--text2)",
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
-                  cursor: "pointer",
+                  background: auto ? "var(--green-glow)" : "var(--bg3)",
+                  borderColor: auto ? "var(--green)" : "var(--border)",
+                  color: auto ? "var(--green)" : "var(--text3)",
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={auto}
-                  onChange={(e) => setAuto(e.target.checked)}
-                  style={{ accentColor: "var(--accent)" }}
-                />{" "}
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: auto ? "var(--green)" : "var(--text3)",
+                    boxShadow: auto ? "0 0 6px var(--green)" : "none",
+                    display: "inline-block",
+                  }}
+                />
                 Live
-              </label>
+              </button>
               <button className="btn btn-sm" onClick={load}>
                 Refresh
               </button>
@@ -1170,8 +1182,6 @@
 
       function MessageBubble({ msg }) {
         const [expanded, setExpanded] = useState(false);
-        const [overflows, setOverflows] = useState(false);
-        const bodyRef = useRef(null);
         const role = msg.role || "unknown";
         const cls = `msg msg-${role}`;
 
@@ -1183,15 +1193,25 @@
             .join("\n");
 
         const charCount = typeof content === "string" ? content.length : 0;
-
-        useEffect(() => {
-          if (bodyRef.current) setOverflows(bodyRef.current.scrollHeight > 200);
-        }, [content]);
+        const preview =
+          charCount > 120
+            ? content.substring(0, 120).replace(/\n/g, " ") + "…"
+            : charCount > 0
+              ? content.replace(/\n/g, " ")
+              : "";
 
         return (
           <div className={cls}>
             <div className="msg-head" onClick={() => setExpanded(!expanded)}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  minWidth: 0,
+                  flex: 1,
+                }}
+              >
                 <span className="role">{role}</span>
                 {msg.name && (
                   <span style={{ fontSize: 11, color: "var(--text3)" }}>
@@ -1206,27 +1226,36 @@
                     id:{msg.tool_call_id.substring(0, 12)}
                   </span>
                 )}
+                {!expanded && preview && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text3)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      minWidth: 0,
+                    }}
+                  >
+                    {preview}
+                  </span>
+                )}
               </div>
               <div className="meta">
                 {charCount > 0 && <span>{charCount} chars</span>}
                 <CopyBtn text={content} />
-                {overflows && (
-                  <button
-                    className="btn btn-icon btn-ghost"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setExpanded(!expanded);
-                    }}
-                  >
-                    {expanded ? Icons.collapse : Icons.expand}
-                  </button>
-                )}
+                <button
+                  className="btn btn-icon btn-ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpanded(!expanded);
+                  }}
+                >
+                  {expanded ? Icons.collapse : Icons.expand}
+                </button>
               </div>
             </div>
-            <div
-              ref={bodyRef}
-              className={`msg-body ${expanded ? "expanded" : "collapsed"}`}
-            >
+            <div className={`msg-body ${expanded ? "expanded" : "collapsed"}`}>
               {content || <em style={{ color: "var(--text3)" }}>(empty)</em>}
             </div>
             {msg.tool_calls && msg.tool_calls.length > 0 && (
@@ -1242,26 +1271,49 @@
 
       function ResponseBubble({ response }) {
         const [expanded, setExpanded] = useState(false);
-        const [overflows, setOverflows] = useState(false);
-        const bodyRef = useRef(null);
 
         const content =
           typeof response === "string" ? response : response.content || "";
         const toolCalls = response.tool_calls || [];
         const usage = response.usage;
 
-        useEffect(() => {
-          if (bodyRef.current) setOverflows(bodyRef.current.scrollHeight > 200);
-        }, [content]);
+        const preview =
+          content.length > 120
+            ? content.substring(0, 120).replace(/\n/g, " ") + "…"
+            : content.length > 0
+              ? content.replace(/\n/g, " ")
+              : "";
 
         return (
           <div className="msg msg-assistant">
             <div className="msg-head" onClick={() => setExpanded(!expanded)}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  minWidth: 0,
+                  flex: 1,
+                }}
+              >
                 <span className="role">Assistant (Response)</span>
                 {toolCalls.length > 0 && (
                   <span className="badge badge-tools">
                     {toolCalls.length} tool calls
+                  </span>
+                )}
+                {!expanded && preview && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text3)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      minWidth: 0,
+                    }}
+                  >
+                    {preview}
                   </span>
                 )}
               </div>
@@ -1274,22 +1326,19 @@
                   </span>
                 )}
                 {content && <CopyBtn text={content} />}
-                {overflows && (
-                  <button
-                    className="btn btn-icon btn-ghost"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setExpanded(!expanded);
-                    }}
-                  >
-                    {expanded ? Icons.collapse : Icons.expand}
-                  </button>
-                )}
+                <button
+                  className="btn btn-icon btn-ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpanded(!expanded);
+                  }}
+                >
+                  {expanded ? Icons.collapse : Icons.expand}
+                </button>
               </div>
             </div>
             {content && (
               <div
-                ref={bodyRef}
                 className={`msg-body ${expanded ? "expanded" : "collapsed"}`}
               >
                 {content}
@@ -1377,11 +1426,13 @@
               .then(setM)
               .catch(() => {});
           poll();
-          const id = setInterval(poll, 3000);
+          const id = setInterval(poll, 10000);
           return () => clearInterval(id);
         }, []);
 
         if (!m) return <div className="empty">Loading metrics...</div>;
+
+        const recent = m.recent || [];
 
         return (
           <>
@@ -1435,9 +1486,137 @@
               </div>
             </div>
 
+            {recent.length > 1 && (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 16,
+                  }}
+                >
+                  <div className="card" style={{ margin: 0 }}>
+                    <div className="card-header">
+                      <h2>Latency &amp; TTFT</h2>
+                    </div>
+                    <div className="card-body" style={{ padding: 12 }}>
+                      <BarChart
+                        data={recent}
+                        series={[
+                          {
+                            key: "latency_s",
+                            label: "Latency",
+                            color: "var(--cyan)",
+                          },
+                          {
+                            key: "first_token_s",
+                            label: "TTFT",
+                            color: "var(--yellow)",
+                          },
+                        ]}
+                        unit="s"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ margin: 0 }}>
+                    <div className="card-header">
+                      <h2>Tokens / sec</h2>
+                    </div>
+                    <div className="card-body" style={{ padding: 12 }}>
+                      <BarChart
+                        data={recent}
+                        series={[
+                          {
+                            key: "tokens_per_sec",
+                            label: "Tok/s",
+                            color: "var(--green)",
+                          },
+                        ]}
+                        unit=""
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    className="card"
+                    style={{ margin: 0, alignSelf: "start" }}
+                  >
+                    <div className="card-header">
+                      <h2>Token Usage</h2>
+                    </div>
+                    <div className="card-body" style={{ padding: 12 }}>
+                      <StackedBarChart
+                        data={recent}
+                        series={[
+                          {
+                            key: "prompt_tokens",
+                            label: "Prompt",
+                            color: "var(--accent)",
+                          },
+                          {
+                            key: "completion_tokens",
+                            label: "Completion",
+                            color: "var(--green)",
+                          },
+                        ]}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="card card-flush" style={{ margin: 0 }}>
+                    <div className="card-header">
+                      <h2>Recent Requests</h2>
+                    </div>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Latency</th>
+                          <th>TTFT</th>
+                          <th>Tok/s</th>
+                          <th>Prompt</th>
+                          <th>Compl.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recent.map((r, i) => (
+                          <tr key={i}>
+                            <td
+                              className="mono"
+                              style={{ fontSize: 11, color: "var(--text3)" }}
+                            >
+                              {i + 1}
+                            </td>
+                            <td className="mono" style={{ fontSize: 11 }}>
+                              {r.latency_s != null ? `${r.latency_s}s` : "—"}
+                            </td>
+                            <td className="mono" style={{ fontSize: 11 }}>
+                              {r.first_token_s != null
+                                ? `${r.first_token_s}s`
+                                : "—"}
+                            </td>
+                            <td className="mono" style={{ fontSize: 11 }}>
+                              {r.tokens_per_sec ?? "—"}
+                            </td>
+                            <td className="mono" style={{ fontSize: 11 }}>
+                              {r.prompt_tokens}
+                            </td>
+                            <td className="mono" style={{ fontSize: 11 }}>
+                              {r.completion_tokens}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="card card-flush">
               <div className="card-header">
-                <h2>Token Usage</h2>
+                <h2>Token Usage (Total)</h2>
               </div>
               <div className="stat-grid">
                 <div className="stat">
@@ -1461,53 +1640,261 @@
                 </div>
               </div>
             </div>
-
-            {m.recent && m.recent.length > 0 && (
-              <div className="card card-flush">
-                <div className="card-header">
-                  <h2>Recent Requests</h2>
-                </div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Endpoint</th>
-                      <th>Latency</th>
-                      <th>TTFT</th>
-                      <th>Tok/s</th>
-                      <th>Prompt</th>
-                      <th>Completion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {m.recent.map((r, i) => (
-                      <tr key={i}>
-                        <td className="mono" style={{ fontSize: 12 }}>
-                          {r.endpoint}
-                        </td>
-                        <td className="mono" style={{ fontSize: 12 }}>
-                          {r.latency_s != null ? `${r.latency_s}s` : "—"}
-                        </td>
-                        <td className="mono" style={{ fontSize: 12 }}>
-                          {r.first_token_s != null
-                            ? `${r.first_token_s}s`
-                            : "—"}
-                        </td>
-                        <td className="mono" style={{ fontSize: 12 }}>
-                          {r.tokens_per_sec ?? "—"}
-                        </td>
-                        <td className="mono" style={{ fontSize: 12 }}>
-                          {r.prompt_tokens}
-                        </td>
-                        <td className="mono" style={{ fontSize: 12 }}>
-                          {r.completion_tokens}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </>
+        );
+      }
+
+      // ── Charts ───────────────────────────────────────────
+
+      function BarChart({ data, series, unit }) {
+        const W = 600,
+          H = 180,
+          PAD = { top: 20, right: 16, bottom: 28, left: 50 };
+        const chartW = W - PAD.left - PAD.right;
+        const chartH = H - PAD.top - PAD.bottom;
+        const n = data.length;
+        if (n === 0) return null;
+
+        // Compute max across all series
+        let maxVal = 0;
+        data.forEach((d) =>
+          series.forEach((s) => {
+            const v = d[s.key];
+            if (v != null && v > maxVal) maxVal = v;
+          }),
+        );
+        if (maxVal === 0) maxVal = 1;
+        const ceil = Math.ceil(maxVal * 1.15 * 10) / 10;
+
+        const groupW = chartW / n;
+        const barW = Math.max(4, Math.min(24, (groupW - 4) / series.length));
+        const groupOffset = (groupW - barW * series.length) / 2;
+
+        // Y-axis ticks
+        const ticks = 4;
+        const tickVals = Array.from(
+          { length: ticks + 1 },
+          (_, i) => +((ceil / ticks) * i).toFixed(2),
+        );
+
+        return (
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            style={{ width: "100%", height: "auto", display: "block" }}
+          >
+            {/* Grid lines */}
+            {tickVals.map((v, i) => {
+              const y = PAD.top + chartH - (v / ceil) * chartH;
+              return (
+                <g key={i}>
+                  <line
+                    x1={PAD.left}
+                    x2={W - PAD.right}
+                    y1={y}
+                    y2={y}
+                    stroke="var(--border)"
+                    strokeDasharray={i === 0 ? "0" : "3,3"}
+                  />
+                  <text
+                    x={PAD.left - 6}
+                    y={y + 3}
+                    textAnchor="end"
+                    fill="var(--text3)"
+                    fontSize="9"
+                    fontFamily="JetBrains Mono, monospace"
+                  >
+                    {v}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Bars */}
+            {data.map((d, di) =>
+              series.map((s, si) => {
+                const v = d[s.key];
+                if (v == null) return null;
+                const barH = (v / ceil) * chartH;
+                const x = PAD.left + di * groupW + groupOffset + si * barW;
+                const y = PAD.top + chartH - barH;
+                return (
+                  <g key={`${di}-${si}`}>
+                    <rect
+                      x={x}
+                      y={y}
+                      width={barW - 1}
+                      height={barH}
+                      fill={s.color}
+                      rx="2"
+                      opacity="0.85"
+                    />
+                    <title>
+                      #{di + 1} {s.label}: {v}
+                      {unit}
+                    </title>
+                  </g>
+                );
+              }),
+            )}
+
+            {/* X labels */}
+            {data.map((_, i) => (
+              <text
+                key={i}
+                x={PAD.left + i * groupW + groupW / 2}
+                y={H - 6}
+                textAnchor="middle"
+                fill="var(--text3)"
+                fontSize="9"
+                fontFamily="JetBrains Mono, monospace"
+              >
+                #{i + 1}
+              </text>
+            ))}
+
+            {/* Legend */}
+            {series.map((s, i) => (
+              <g key={i} transform={`translate(${PAD.left + i * 90}, 10)`}>
+                <rect
+                  width="8"
+                  height="8"
+                  rx="2"
+                  fill={s.color}
+                  opacity="0.85"
+                />
+                <text
+                  x="12"
+                  y="8"
+                  fill="var(--text2)"
+                  fontSize="9"
+                  fontFamily="Inter, sans-serif"
+                >
+                  {s.label}
+                </text>
+              </g>
+            ))}
+          </svg>
+        );
+      }
+
+      function StackedBarChart({ data, series }) {
+        const W = 600,
+          H = 180,
+          PAD = { top: 20, right: 16, bottom: 28, left: 50 };
+        const chartW = W - PAD.left - PAD.right;
+        const chartH = H - PAD.top - PAD.bottom;
+        const n = data.length;
+        if (n === 0) return null;
+
+        let maxVal = 0;
+        data.forEach((d) => {
+          let sum = 0;
+          series.forEach((s) => (sum += d[s.key] || 0));
+          if (sum > maxVal) maxVal = sum;
+        });
+        if (maxVal === 0) maxVal = 1;
+        const ceil = Math.ceil(maxVal * 1.15);
+
+        const groupW = chartW / n;
+        const barW = Math.max(6, Math.min(32, groupW - 6));
+        const barX = (groupW - barW) / 2;
+
+        const ticks = 4;
+        const step = Math.ceil(ceil / ticks);
+        const tickVals = Array.from({ length: ticks + 1 }, (_, i) => step * i);
+
+        return (
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            style={{ width: "100%", height: "auto", display: "block" }}
+          >
+            {tickVals.map((v, i) => {
+              const y = PAD.top + chartH - (v / ceil) * chartH;
+              return (
+                <g key={i}>
+                  <line
+                    x1={PAD.left}
+                    x2={W - PAD.right}
+                    y1={y}
+                    y2={y}
+                    stroke="var(--border)"
+                    strokeDasharray={i === 0 ? "0" : "3,3"}
+                  />
+                  <text
+                    x={PAD.left - 6}
+                    y={y + 3}
+                    textAnchor="end"
+                    fill="var(--text3)"
+                    fontSize="9"
+                    fontFamily="JetBrains Mono, monospace"
+                  >
+                    {v}
+                  </text>
+                </g>
+              );
+            })}
+
+            {data.map((d, di) => {
+              let cumY = 0;
+              return series.map((s, si) => {
+                const v = d[s.key] || 0;
+                const barH = (v / ceil) * chartH;
+                const y = PAD.top + chartH - cumY - barH;
+                cumY += barH;
+                return (
+                  <g key={`${di}-${si}`}>
+                    <rect
+                      x={PAD.left + di * groupW + barX}
+                      y={y}
+                      width={barW}
+                      height={barH}
+                      fill={s.color}
+                      rx="2"
+                      opacity="0.85"
+                    />
+                    <title>
+                      #{di + 1} {s.label}: {v}
+                    </title>
+                  </g>
+                );
+              });
+            })}
+
+            {data.map((_, i) => (
+              <text
+                key={i}
+                x={PAD.left + i * groupW + groupW / 2}
+                y={H - 6}
+                textAnchor="middle"
+                fill="var(--text3)"
+                fontSize="9"
+                fontFamily="JetBrains Mono, monospace"
+              >
+                #{i + 1}
+              </text>
+            ))}
+
+            {series.map((s, i) => (
+              <g key={i} transform={`translate(${PAD.left + i * 100}, 10)`}>
+                <rect
+                  width="8"
+                  height="8"
+                  rx="2"
+                  fill={s.color}
+                  opacity="0.85"
+                />
+                <text
+                  x="12"
+                  y="8"
+                  fill="var(--text2)"
+                  fontSize="9"
+                  fontFamily="Inter, sans-serif"
+                >
+                  {s.label}
+                </text>
+              </g>
+            ))}
+          </svg>
         );
       }
 

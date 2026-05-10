@@ -271,20 +271,28 @@ async def _proxy_request(request: Request, url: str) -> Response:
         except (json.JSONDecodeError, UnicodeDecodeError):
             pass
 
-    # Rewrite model name
-    if request_data and "model" in request_data:
-        original_model = request_data["model"]
-        request_data["model"] = _resolve_model(original_model)
-        body = json.dumps(request_data).encode()
-        headers["content-length"] = str(len(body))
-        if original_model != request_data["model"]:
-            logger.info(
-                "→ %s  model: %s → %s", url, original_model, request_data["model"]
-            )
+    # Rewrite model name (covers both "model" and "name" fields)
+    if request_data:
+        rewritten = False
+        for field in ("model", "name"):
+            if field in request_data:
+                original_model = original_model or request_data[field]
+                request_data[field] = _resolve_model(request_data[field])
+                rewritten = True
+        if rewritten:
+            body = json.dumps(request_data).encode()
+            headers["content-length"] = str(len(body))
+            if original_model != _runtime_config["model_name"]:
+                logger.info(
+                    "→ %s  model: %s → %s",
+                    url,
+                    original_model,
+                    _runtime_config["model_name"],
+                )
+            else:
+                logger.info("→ %s  model: %s", url, original_model)
         else:
-            logger.info("→ %s  model: %s", url, original_model)
-    else:
-        logger.info("→ %s", url)
+            logger.info("→ %s", url)
 
     is_stream = _is_streaming(body, url)
     is_inference = url in _INFERENCE_ENDPOINTS

@@ -14,6 +14,19 @@ logging.basicConfig(
 )
 
 
+class _QuietAccessFilter(logging.Filter):
+    """Suppress uvicorn access logs for dashboard polling and health checks."""
+
+    _NOISY = ("/health", "/dashboard/api/")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        return not any(p in msg for p in self._NOISY)
+
+
+logging.getLogger("uvicorn.access").addFilter(_QuietAccessFilter())
+
+
 def main() -> None:
     print("┌──────────────────────────────────────────────────┐")
     print("│               TunneLLM Proxy                     │")
@@ -32,6 +45,9 @@ def main() -> None:
     print(f"    POST http://{settings.local_host}:{settings.local_port}/v1/completions")
     print(f"    POST http://{settings.local_host}:{settings.local_port}/v1/embeddings")
     print(f"    GET  http://{settings.local_host}:{settings.local_port}/v1/models")
+    print()
+    print("  Dashboard:")
+    print(f"    http://{settings.local_host}:{settings.local_port}/dashboard")
     print()
     print("  Monitoring:")
     print(f"    GET  http://{settings.local_host}:{settings.local_port}/health")
