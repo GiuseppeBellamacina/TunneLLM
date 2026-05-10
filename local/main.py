@@ -16,11 +16,30 @@ logging.basicConfig(
 
 
 def main() -> None:
-    print(f"Starting TunneLLM proxy on {settings.local_host}:{settings.local_port}")
-    print(f"  SSH tunnel port: {settings.tunnel_port} → {settings.remote_host}:{settings.remote_port}")
-    print(f"  SSH target: {settings.ssh_user}@{settings.ssh_host}:{settings.ssh_port}")
-    print(f"  Model: {settings.model_name}")
-    print(f"  VS Code Copilot → http://{settings.local_host}:{settings.local_port}")
+    print("┌──────────────────────────────────────────────────┐")
+    print("│               TunneLLM Proxy                     │")
+    print("└──────────────────────────────────────────────────┘")
+    print(f"  Proxy:    http://{settings.local_host}:{settings.local_port}")
+    print(f"  Model:    {settings.model_name}")
+    print(f"  SSH:      {settings.ssh_user}@{settings.ssh_host}:{settings.ssh_port}")
+    print(
+        f"  Tunnel:   localhost:{settings.tunnel_port} → {settings.remote_host}:{settings.remote_port}"
+    )
+    print()
+    print("  OpenAI-compatible endpoints:")
+    print(
+        f"    POST http://{settings.local_host}:{settings.local_port}/v1/chat/completions"
+    )
+    print(f"    POST http://{settings.local_host}:{settings.local_port}/v1/completions")
+    print(f"    POST http://{settings.local_host}:{settings.local_port}/v1/embeddings")
+    print(f"    GET  http://{settings.local_host}:{settings.local_port}/v1/models")
+    print()
+    print("  Monitoring:")
+    print(f"    GET  http://{settings.local_host}:{settings.local_port}/health")
+    print(f"    GET  http://{settings.local_host}:{settings.local_port}/metrics")
+    print()
+    print(f"  Max concurrent inferences: {settings.max_concurrent_inferences}")
+    print(f"  Retry policy: {settings.max_retries}x with exponential backoff")
     print()
 
     uvicorn.run(

@@ -1,4 +1,14 @@
-FROM ./Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf
+FROM ./Qwen3.6-35B-A3B-UD-Q4_K_S.gguf
+
+RENDERER qwen3-coder
+PARSER qwen3-coder
+PARAMETER repeat_penalty 1.05
+PARAMETER stop <|im_start|>
+PARAMETER stop <|im_end|>
+PARAMETER stop <|endoftext|>
+PARAMETER temperature 0.7
+PARAMETER top_k 20
+PARAMETER top_p 0.8
 
 TEMPLATE """{{- if .System }}
 <|im_start|>system

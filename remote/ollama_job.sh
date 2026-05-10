@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=training
-#SBATCH --output=ollama-%j.log
-#SBATCH --error=ollama-%j.log
+#SBATCH --output=logs/ollama-%j.log
+#SBATCH --error=logs/ollama-%j.log
 #SBATCH --gres=gpu:1 --gres=shard:22528
 #SBATCH --mem=48G
 #SBATCH --cpus-per-task=8

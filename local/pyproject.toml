@@ -2,7 +2,6 @@
 name = "tunnelmm"
 version = "0.1.0"
 description = "A proxy for Ollama models"
-readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.0",
@@ -17,8 +16,12 @@ dependencies = [
 requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+py-modules = ["main", "server", "tunnel", "config", "metrics", "request_log"]
+
 [project.optional-dependencies]
 dev = [
     "ruff>=0.1.0",
-    "mypy>=1.0.0",
+    "black>=23.0.0",
+    "isort>=5.0.0",
 ]

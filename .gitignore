@@ -3,4 +3,7 @@ __pycache__/
 *.pyc
 .venv/
 
+*.egg-info/
+*.ruff_cache/
+
 ollama-download/

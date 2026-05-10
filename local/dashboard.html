@@ -1,0 +1,1667 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TunneLLM Dashboard</title>
+    <script
+      src="https://unpkg.com/react@18/umd/react.production.min.js"
+      crossorigin
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+      crossorigin
+    ></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap");
+      :root {
+        --bg: #08090d;
+        --bg2: #0f1118;
+        --bg3: #171a24;
+        --bg4: #1e2231;
+        --border: #252a3a;
+        --border2: #333a50;
+        --text: #e4e8f7;
+        --text2: #7a82a0;
+        --text3: #4a5170;
+        --accent: #6c8aff;
+        --accent2: #4a6aff;
+        --accent-glow: rgba(108, 138, 255, 0.15);
+        --green: #34d399;
+        --green-glow: rgba(52, 211, 153, 0.12);
+        --red: #f87171;
+        --red-glow: rgba(248, 113, 113, 0.12);
+        --yellow: #fbbf24;
+        --yellow-glow: rgba(251, 191, 36, 0.1);
+        --purple: #a78bfa;
+        --purple-glow: rgba(167, 139, 250, 0.1);
+        --cyan: #22d3ee;
+        --cyan-glow: rgba(34, 211, 238, 0.1);
+        --radius: 10px;
+        --radius-sm: 6px;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Inter", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        overflow: hidden;
+      }
+      code,
+      .mono {
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .app {
+        display: flex;
+        height: 100vh;
+      }
+
+      /* ── Sidebar ─── */
+      .sidebar {
+        width: 220px;
+        background: var(--bg2);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+      }
+      .sidebar-header {
+        padding: 20px 18px 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      .sidebar-header h1 {
+        font-size: 18px;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--accent), var(--cyan));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        letter-spacing: -0.5px;
+      }
+      .sidebar-header .status {
+        display: flex;
+        gap: 12px;
+        margin-top: 10px;
+        font-size: 11px;
+        color: var(--text2);
+      }
+      .status-pill {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 8px;
+        background: var(--bg3);
+        border-radius: 20px;
+      }
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+      .status-dot.up {
+        background: var(--green);
+        box-shadow: 0 0 6px var(--green);
+      }
+      .status-dot.down {
+        background: var(--red);
+        box-shadow: 0 0 6px var(--red);
+      }
+
+      .nav {
+        flex: 1;
+        padding: 8px 0;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 18px;
+        cursor: pointer;
+        color: var(--text2);
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.2s;
+        border-left: 2px solid transparent;
+      }
+      .nav-item:hover {
+        background: var(--bg3);
+        color: var(--text);
+      }
+      .nav-item.active {
+        color: var(--accent);
+        background: var(--accent-glow);
+        border-left-color: var(--accent);
+      }
+      .nav-item svg {
+        width: 16px;
+        height: 16px;
+        opacity: 0.7;
+      }
+      .nav-item.active svg {
+        opacity: 1;
+      }
+
+      /* ── Main ─── */
+      .main {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px 28px;
+      }
+      .main::-webkit-scrollbar {
+        width: 6px;
+      }
+      .main::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .main::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+      }
+
+      .page-title {
+        font-size: 20px;
+        font-weight: 700;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .page-title .count {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent);
+        background: var(--accent-glow);
+        padding: 2px 10px;
+        border-radius: 20px;
+      }
+
+      /* ── Cards ─── */
+      .card {
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-bottom: 16px;
+        overflow: hidden;
+      }
+      .card-header {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .card-header h2 {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        color: var(--text2);
+      }
+      .card-body {
+        padding: 16px 18px;
+      }
+      .card-flush {
+        padding: 0;
+      }
+
+      /* ── Stats ─── */
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 1px;
+        background: var(--border);
+      }
+      .stat-grid > .stat {
+        background: var(--bg2);
+      }
+      .stat {
+        text-align: center;
+        padding: 20px 12px;
+      }
+      .stat .value {
+        font-size: 26px;
+        font-weight: 700;
+        font-family: "JetBrains Mono", monospace;
+      }
+      .stat .label {
+        font-size: 11px;
+        color: var(--text2);
+        margin-top: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .stat .value.blue {
+        color: var(--accent);
+      }
+      .stat .value.green {
+        color: var(--green);
+      }
+      .stat .value.red {
+        color: var(--red);
+      }
+      .stat .value.yellow {
+        color: var(--yellow);
+      }
+      .stat .value.cyan {
+        color: var(--cyan);
+      }
+
+      /* ── Table ─── */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        text-align: left;
+        padding: 10px 14px;
+        color: var(--text3);
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg3);
+      }
+      td {
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border);
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      tr.clickable {
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      tr.clickable:hover {
+        background: var(--bg3);
+      }
+
+      /* ── Badges ─── */
+      .badge {
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        font-family: "JetBrains Mono", monospace;
+      }
+      .badge-ok {
+        background: var(--green-glow);
+        color: var(--green);
+      }
+      .badge-fail {
+        background: var(--red-glow);
+        color: var(--red);
+      }
+      .badge-progress {
+        background: var(--yellow-glow);
+        color: var(--yellow);
+      }
+      .badge-stream {
+        background: var(--cyan-glow);
+        color: var(--cyan);
+      }
+      .badge-tools {
+        background: var(--purple-glow);
+        color: var(--purple);
+      }
+
+      /* ── Messages ─── */
+      .msg-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .msg {
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        line-height: 1.6;
+        border: 1px solid var(--border);
+        overflow: hidden;
+      }
+      .msg-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 14px;
+        background: var(--bg3);
+        cursor: pointer;
+        user-select: none;
+      }
+      .msg-head .role {
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+      }
+      .msg-head .meta {
+        font-size: 11px;
+        color: var(--text3);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .msg-body {
+        padding: 12px 14px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 200px;
+        overflow-y: auto;
+        position: relative;
+        transition: max-height 0.3s ease;
+      }
+      .msg-body.expanded {
+        max-height: none;
+      }
+      .msg-body.collapsed {
+        max-height: 200px;
+      }
+      .msg-body::-webkit-scrollbar {
+        width: 4px;
+      }
+      .msg-body::-webkit-scrollbar-thumb {
+        background: var(--border2);
+        border-radius: 2px;
+      }
+
+      .msg-system {
+        border-color: rgba(167, 139, 250, 0.2);
+      }
+      .msg-system .msg-head {
+        background: var(--purple-glow);
+      }
+      .msg-system .role {
+        color: var(--purple);
+      }
+      .msg-user {
+        border-color: rgba(108, 138, 255, 0.2);
+      }
+      .msg-user .msg-head {
+        background: var(--accent-glow);
+      }
+      .msg-user .role {
+        color: var(--accent);
+      }
+      .msg-assistant {
+        border-color: rgba(52, 211, 153, 0.2);
+      }
+      .msg-assistant .msg-head {
+        background: var(--green-glow);
+      }
+      .msg-assistant .role {
+        color: var(--green);
+      }
+      .msg-tool {
+        border-color: rgba(251, 191, 36, 0.2);
+      }
+      .msg-tool .msg-head {
+        background: var(--yellow-glow);
+      }
+      .msg-tool .role {
+        color: var(--yellow);
+      }
+
+      .tool-calls {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+      }
+      .tool-call {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 8px 12px;
+        margin-top: 6px;
+        font-size: 12px;
+      }
+      .tool-call .name {
+        color: var(--yellow);
+        font-weight: 600;
+        font-family: "JetBrains Mono", monospace;
+      }
+      .tool-call .args {
+        color: var(--text2);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        white-space: pre-wrap;
+        margin-top: 4px;
+        max-height: 150px;
+        overflow-y: auto;
+      }
+
+      /* ── Buttons ─── */
+      .btn {
+        padding: 7px 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        transition: all 0.15s;
+        background: var(--bg3);
+        color: var(--text2);
+      }
+      .btn:hover {
+        background: var(--bg4);
+        color: var(--text);
+        border-color: var(--border2);
+      }
+      .btn-primary {
+        background: var(--accent2);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      .btn-primary:hover {
+        background: var(--accent);
+      }
+      .btn-sm {
+        padding: 4px 10px;
+        font-size: 11px;
+      }
+      .btn-icon {
+        padding: 4px 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .btn-ghost {
+        background: transparent;
+        border-color: transparent;
+      }
+      .btn-ghost:hover {
+        background: var(--bg3);
+      }
+
+      .back-btn {
+        background: none;
+        border: none;
+        color: var(--accent);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 16px;
+      }
+      .back-btn:hover {
+        text-decoration: underline;
+      }
+
+      /* ── Forms ─── */
+      .form-group {
+        margin-bottom: 16px;
+      }
+      .form-group label {
+        display: block;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text2);
+        margin-bottom: 6px;
+      }
+      .form-group input {
+        width: 100%;
+        padding: 10px 14px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text);
+        font-size: 14px;
+        font-family: "JetBrains Mono", monospace;
+        transition: border-color 0.2s;
+      }
+      .form-group input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+
+      /* ── Detail grid ─── */
+      .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        padding: 16px 18px;
+      }
+      .detail-item {
+        font-size: 13px;
+      }
+      .detail-item .dl {
+        color: var(--text3);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 2px;
+      }
+      .detail-item .dv {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+      }
+
+      /* ── Toast ─── */
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: var(--bg3);
+        border: 1px solid var(--green);
+        color: var(--green);
+        padding: 12px 20px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 600;
+        z-index: 100;
+        animation:
+          toast-in 0.3s ease,
+          toast-out 0.3s ease 2s forwards;
+        box-shadow: 0 0 20px var(--green-glow);
+      }
+      @keyframes toast-in {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes toast-out {
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+        }
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .empty {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--text3);
+        font-size: 14px;
+      }
+      .json-view {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 14px;
+        overflow-x: auto;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 400px;
+        overflow-y: auto;
+        color: var(--text2);
+      }
+
+      .copy-ok {
+        color: var(--green) !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      const { useState, useEffect, useCallback, useRef } = React;
+      const API = "";
+
+      // ── Icons (inline SVG) ────────────────────────────────
+
+      const Icons = {
+        requests: (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M21 12H3M21 6H3M21 18H3" />
+          </svg>
+        ),
+        metrics: (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M18 20V10M12 20V4M6 20v-6" />
+          </svg>
+        ),
+        settings: (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        ),
+        copy: (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            width="14"
+            height="14"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        ),
+        check: (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            width="14"
+            height="14"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        ),
+        expand: (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            width="14"
+            height="14"
+          >
+            <polyline points="15 3 21 3 21 9" />
+            <polyline points="9 21 3 21 3 15" />
+            <line x1="21" y1="3" x2="14" y2="10" />
+            <line x1="3" y1="21" x2="10" y2="14" />
+          </svg>
+        ),
+        collapse: (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            width="14"
+            height="14"
+          >
+            <polyline points="4 14 10 14 10 20" />
+            <polyline points="20 10 14 10 14 4" />
+            <line x1="14" y1="10" x2="21" y2="3" />
+            <line x1="3" y1="21" x2="10" y2="14" />
+          </svg>
+        ),
+        back: (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            width="16"
+            height="16"
+          >
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+        ),
+      };
+
+      function CopyBtn({ text }) {
+        const [copied, setCopied] = useState(false);
+        const copy = (e) => {
+          e.stopPropagation();
+          navigator.clipboard.writeText(text || "");
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        };
+        return (
+          <button
+            className={`btn btn-icon btn-ghost ${copied ? "copy-ok" : ""}`}
+            onClick={copy}
+            title="Copy"
+          >
+            {copied ? Icons.check : Icons.copy}
+          </button>
+        );
+      }
+
+      // ── App ─────────────────────────────────────────────────
+
+      function App() {
+        const [tab, setTab] = useState("requests");
+        const [health, setHealth] = useState(null);
+
+        useEffect(() => {
+          const poll = () =>
+            fetch(`${API}/health`)
+              .then((r) => r.json())
+              .then(setHealth)
+              .catch(() => {});
+          poll();
+          const id = setInterval(poll, 5000);
+          return () => clearInterval(id);
+        }, []);
+
+        const tabs = [
+          { id: "requests", label: "Requests", icon: Icons.requests },
+          { id: "metrics", label: "Metrics", icon: Icons.metrics },
+          { id: "settings", label: "Settings", icon: Icons.settings },
+        ];
+
+        return (
+          <div className="app">
+            <div className="sidebar">
+              <div className="sidebar-header">
+                <h1>TunneLLM</h1>
+                {health && (
+                  <div className="status">
+                    <div className="status-pill">
+                      <span className={`status-dot ${health.tunnel}`}></span>
+                      Tunnel
+                    </div>
+                    <div className="status-pill">
+                      <span className={`status-dot ${health.ollama}`}></span>
+                      Ollama
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="nav">
+                {tabs.map((t) => (
+                  <div
+                    key={t.id}
+                    className={`nav-item ${tab === t.id ? "active" : ""}`}
+                    onClick={() => setTab(t.id)}
+                  >
+                    {t.icon}
+                    {t.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="main">
+              {tab === "requests" && <RequestsTab />}
+              {tab === "metrics" && <MetricsTab />}
+              {tab === "settings" && <SettingsTab />}
+            </div>
+          </div>
+        );
+      }
+
+      // ═══════════════════════════════════════════════════════
+      //  Requests Tab (merged requests + conversations)
+      // ═══════════════════════════════════════════════════════
+
+      function RequestsTab() {
+        const [requests, setRequests] = useState([]);
+        const [selected, setSelected] = useState(null);
+        const [detail, setDetail] = useState(null);
+        const [auto, setAuto] = useState(true);
+        const [filter, setFilter] = useState("all"); // all | chat | other
+
+        const load = useCallback(() => {
+          fetch(`${API}/dashboard/api/requests`)
+            .then((r) => r.json())
+            .then(setRequests)
+            .catch(() => {});
+        }, []);
+
+        useEffect(() => {
+          load();
+        }, [load]);
+        useEffect(() => {
+          if (!auto) return;
+          const id = setInterval(load, 2000);
+          return () => clearInterval(id);
+        }, [auto, load]);
+
+        useEffect(() => {
+          if (!selected) {
+            setDetail(null);
+            return;
+          }
+          fetch(`${API}/dashboard/api/requests/${selected}`)
+            .then((r) => r.json())
+            .then(setDetail)
+            .catch(() => {});
+        }, [selected]);
+
+        const filtered =
+          filter === "all"
+            ? requests
+            : filter === "chat"
+              ? requests.filter((r) => r.url.includes("chat/completions"))
+              : requests.filter((r) => !r.url.includes("chat/completions"));
+
+        if (detail)
+          return (
+            <RequestDetail detail={detail} onBack={() => setSelected(null)} />
+          );
+
+        return (
+          <>
+            <div className="page-title">
+              Requests <span className="count">{filtered.length}</span>
+            </div>
+            <div className="toolbar">
+              <div style={{ display: "flex", gap: 4 }}>
+                {[
+                  ["all", "All"],
+                  ["chat", "Chat"],
+                  ["other", "Other"],
+                ].map(([k, l]) => (
+                  <button
+                    key={k}
+                    className={`btn btn-sm ${filter === k ? "btn-primary" : ""}`}
+                    onClick={() => setFilter(k)}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <div style={{ flex: 1 }}></div>
+              <label
+                style={{
+                  fontSize: 12,
+                  color: "var(--text2)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={auto}
+                  onChange={(e) => setAuto(e.target.checked)}
+                  style={{ accentColor: "var(--accent)" }}
+                />{" "}
+                Live
+              </label>
+              <button className="btn btn-sm" onClick={load}>
+                Refresh
+              </button>
+            </div>
+            <div className="card card-flush">
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ width: 80 }}>Time</th>
+                    <th>Endpoint</th>
+                    <th>Model</th>
+                    <th style={{ width: 70 }}>Status</th>
+                    <th style={{ width: 90 }}>Latency</th>
+                    <th style={{ width: 60 }}>Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((r) => (
+                    <tr
+                      key={r.id}
+                      className="clickable"
+                      onClick={() => setSelected(r.id)}
+                    >
+                      <td
+                        className="mono"
+                        style={{ fontSize: 12, color: "var(--text2)" }}
+                      >
+                        {new Date(r.timestamp * 1000).toLocaleTimeString()}
+                      </td>
+                      <td className="mono" style={{ fontSize: 12 }}>
+                        {r.url}
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        {r.model_original || "—"}
+                      </td>
+                      <td>
+                        <span
+                          className={`badge ${r.status === "completed" ? "badge-ok" : r.status === "failed" ? "badge-fail" : "badge-progress"}`}
+                        >
+                          {r.response_status || "..."}
+                        </span>
+                      </td>
+                      <td
+                        className="mono"
+                        style={{ fontSize: 12, color: "var(--text2)" }}
+                      >
+                        {r.latency_ms != null ? `${r.latency_ms}ms` : ". . ."}
+                      </td>
+                      <td>
+                        {r.streaming ? (
+                          <span className="badge badge-stream">SSE</span>
+                        ) : (
+                          <span style={{ color: "var(--text3)", fontSize: 12 }}>
+                            REQ
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="empty">
+                        No requests yet
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        );
+      }
+
+      // ── Request Detail ───────────────────────────────────
+
+      function RequestDetail({ detail, onBack }) {
+        const [showRaw, setShowRaw] = useState(false);
+
+        const hasMessages = detail.request_body?.messages?.length > 0;
+        const hasTools = detail.request_body?.tools?.length > 0;
+        const toolNames = hasTools
+          ? detail.request_body.tools
+              .map((t) => t.function?.name)
+              .filter(Boolean)
+          : [];
+
+        return (
+          <>
+            <button className="back-btn" onClick={onBack}>
+              {Icons.back} Back to requests
+            </button>
+
+            {/* Meta card */}
+            <div className="card">
+              <div className="detail-grid">
+                <div className="detail-item">
+                  <div className="dl">Endpoint</div>
+                  <div className="dv mono">{detail.url}</div>
+                </div>
+                <div className="detail-item">
+                  <div className="dl">Status</div>
+                  <div className="dv">
+                    <span
+                      className={`badge ${detail.status === "completed" ? "badge-ok" : "badge-fail"}`}
+                    >
+                      {detail.response_status}
+                    </span>
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <div className="dl">Latency</div>
+                  <div className="dv mono">
+                    {detail.latency_ms != null ? `${detail.latency_ms}ms` : "—"}
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <div className="dl">TTFT</div>
+                  <div className="dv mono">
+                    {detail.ttft_ms != null ? `${detail.ttft_ms}ms` : "—"}
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <div className="dl">Model</div>
+                  <div className="dv">
+                    {detail.model_original} → {detail.model_resolved}
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <div className="dl">Streaming</div>
+                  <div className="dv">
+                    {detail.streaming ? (
+                      <span className="badge badge-stream">SSE</span>
+                    ) : (
+                      "No"
+                    )}
+                  </div>
+                </div>
+                {hasTools && (
+                  <div className="detail-item">
+                    <div className="dl">Tools</div>
+                    <div className="dv">
+                      <span className="badge badge-tools">
+                        {toolNames.length} tools
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {detail.error && (
+                  <div className="detail-item">
+                    <div className="dl">Error</div>
+                    <div className="dv" style={{ color: "var(--red)" }}>
+                      {detail.error}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Conversation */}
+            {hasMessages && (
+              <div className="card">
+                <div className="card-header">
+                  <h2>Conversation</h2>
+                  <span style={{ fontSize: 11, color: "var(--text3)" }}>
+                    {detail.request_body.messages.length} messages
+                  </span>
+                </div>
+                <div className="card-body">
+                  <ConversationView
+                    request={detail.request_body}
+                    response={detail.response_body}
+                    toolNames={toolNames}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Raw data */}
+            <div className="card">
+              <div className="card-header">
+                <h2>Raw JSON</h2>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setShowRaw(!showRaw)}
+                >
+                  {showRaw ? "Hide" : "Show"}
+                </button>
+              </div>
+              {showRaw && (
+                <div className="card-body">
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                      Request Body
+                    </span>
+                    <CopyBtn
+                      text={JSON.stringify(detail.request_body, null, 2)}
+                    />
+                  </div>
+                  <div className="json-view">
+                    {JSON.stringify(detail.request_body, null, 2)}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      margin: "16px 0 8px",
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                      Response Body
+                    </span>
+                    <CopyBtn
+                      text={JSON.stringify(detail.response_body, null, 2)}
+                    />
+                  </div>
+                  <div className="json-view">
+                    {JSON.stringify(detail.response_body, null, 2)}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        );
+      }
+
+      // ── Conversation View ────────────────────────────────
+
+      function ConversationView({ request, response, toolNames }) {
+        const messages = request?.messages || [];
+
+        return (
+          <div className="msg-list">
+            {toolNames && toolNames.length > 0 && (
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--text3)",
+                  marginBottom: 4,
+                  display: "flex",
+                  gap: 6,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
+                <span>Tools:</span>
+                {toolNames.map((n, i) => (
+                  <span
+                    key={i}
+                    className="badge badge-tools"
+                    style={{ fontSize: 10 }}
+                  >
+                    {n}
+                  </span>
+                ))}
+              </div>
+            )}
+            {messages.map((m, i) => (
+              <MessageBubble key={i} msg={m} />
+            ))}
+            {response && <ResponseBubble response={response} />}
+          </div>
+        );
+      }
+
+      function MessageBubble({ msg }) {
+        const [expanded, setExpanded] = useState(false);
+        const [overflows, setOverflows] = useState(false);
+        const bodyRef = useRef(null);
+        const role = msg.role || "unknown";
+        const cls = `msg msg-${role}`;
+
+        let content = msg.content || "";
+        if (Array.isArray(content))
+          content = content
+            .filter((p) => p.type === "text")
+            .map((p) => p.text)
+            .join("\n");
+
+        const charCount = typeof content === "string" ? content.length : 0;
+
+        useEffect(() => {
+          if (bodyRef.current) setOverflows(bodyRef.current.scrollHeight > 200);
+        }, [content]);
+
+        return (
+          <div className={cls}>
+            <div className="msg-head" onClick={() => setExpanded(!expanded)}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="role">{role}</span>
+                {msg.name && (
+                  <span style={{ fontSize: 11, color: "var(--text3)" }}>
+                    ({msg.name})
+                  </span>
+                )}
+                {msg.tool_call_id && (
+                  <span
+                    className="mono"
+                    style={{ fontSize: 10, color: "var(--text3)" }}
+                  >
+                    id:{msg.tool_call_id.substring(0, 12)}
+                  </span>
+                )}
+              </div>
+              <div className="meta">
+                {charCount > 0 && <span>{charCount} chars</span>}
+                <CopyBtn text={content} />
+                {overflows && (
+                  <button
+                    className="btn btn-icon btn-ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpanded(!expanded);
+                    }}
+                  >
+                    {expanded ? Icons.collapse : Icons.expand}
+                  </button>
+                )}
+              </div>
+            </div>
+            <div
+              ref={bodyRef}
+              className={`msg-body ${expanded ? "expanded" : "collapsed"}`}
+            >
+              {content || <em style={{ color: "var(--text3)" }}>(empty)</em>}
+            </div>
+            {msg.tool_calls && msg.tool_calls.length > 0 && (
+              <div className="tool-calls" style={{ padding: "0 14px 12px" }}>
+                {msg.tool_calls.map((tc, i) => (
+                  <ToolCallView key={i} tc={tc} />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      function ResponseBubble({ response }) {
+        const [expanded, setExpanded] = useState(false);
+        const [overflows, setOverflows] = useState(false);
+        const bodyRef = useRef(null);
+
+        const content =
+          typeof response === "string" ? response : response.content || "";
+        const toolCalls = response.tool_calls || [];
+        const usage = response.usage;
+
+        useEffect(() => {
+          if (bodyRef.current) setOverflows(bodyRef.current.scrollHeight > 200);
+        }, [content]);
+
+        return (
+          <div className="msg msg-assistant">
+            <div className="msg-head" onClick={() => setExpanded(!expanded)}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="role">Assistant (Response)</span>
+                {toolCalls.length > 0 && (
+                  <span className="badge badge-tools">
+                    {toolCalls.length} tool calls
+                  </span>
+                )}
+              </div>
+              <div className="meta">
+                {usage && (
+                  <span>
+                    {(usage.prompt_tokens || 0) +
+                      (usage.completion_tokens || 0)}{" "}
+                    tok
+                  </span>
+                )}
+                {content && <CopyBtn text={content} />}
+                {overflows && (
+                  <button
+                    className="btn btn-icon btn-ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpanded(!expanded);
+                    }}
+                  >
+                    {expanded ? Icons.collapse : Icons.expand}
+                  </button>
+                )}
+              </div>
+            </div>
+            {content && (
+              <div
+                ref={bodyRef}
+                className={`msg-body ${expanded ? "expanded" : "collapsed"}`}
+              >
+                {content}
+              </div>
+            )}
+            {toolCalls.length > 0 && (
+              <div className="tool-calls" style={{ padding: "0 14px 12px" }}>
+                {toolCalls.map((tc, i) => (
+                  <ToolCallView key={i} tc={tc} />
+                ))}
+              </div>
+            )}
+            {usage && (
+              <div
+                style={{
+                  padding: "8px 14px",
+                  borderTop: "1px solid var(--border)",
+                  fontSize: 11,
+                  color: "var(--text3)",
+                  display: "flex",
+                  gap: 16,
+                }}
+              >
+                <span>Prompt: {usage.prompt_tokens}</span>
+                <span>Completion: {usage.completion_tokens}</span>
+                <span>
+                  Total:{" "}
+                  {(usage.prompt_tokens || 0) + (usage.completion_tokens || 0)}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      function ToolCallView({ tc }) {
+        const [expanded, setExpanded] = useState(false);
+        const args = tc.function?.arguments || "";
+        const needsExpand = args.length > 200;
+
+        return (
+          <div className="tool-call">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span className="name">{tc.function?.name || "?"}</span>
+              <div style={{ display: "flex", gap: 4 }}>
+                <CopyBtn text={args} />
+                {needsExpand && (
+                  <button
+                    className="btn btn-icon btn-ghost"
+                    onClick={() => setExpanded(!expanded)}
+                  >
+                    {expanded ? Icons.collapse : Icons.expand}
+                  </button>
+                )}
+              </div>
+            </div>
+            {args && (
+              <div className="args">
+                {expanded || !needsExpand
+                  ? args
+                  : args.substring(0, 200) + "..."}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // ═══════════════════════════════════════════════════════
+      //  Metrics Tab
+      // ═══════════════════════════════════════════════════════
+
+      function MetricsTab() {
+        const [m, setM] = useState(null);
+
+        useEffect(() => {
+          const poll = () =>
+            fetch(`${API}/dashboard/api/metrics`)
+              .then((r) => r.json())
+              .then(setM)
+              .catch(() => {});
+          poll();
+          const id = setInterval(poll, 3000);
+          return () => clearInterval(id);
+        }, []);
+
+        if (!m) return <div className="empty">Loading metrics...</div>;
+
+        return (
+          <>
+            <div className="page-title">Metrics</div>
+            <div className="card card-flush">
+              <div className="stat-grid">
+                <div className="stat">
+                  <div className="value blue">{m.total_requests}</div>
+                  <div className="label">Requests</div>
+                </div>
+                <div className="stat">
+                  <div className="value green">{m.completed}</div>
+                  <div className="label">Completed</div>
+                </div>
+                <div className="stat">
+                  <div className="value red">{m.failed}</div>
+                  <div className="label">Failed</div>
+                </div>
+                <div className="stat">
+                  <div className="value yellow">{m.in_progress}</div>
+                  <div className="label">In Progress</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="card card-flush">
+              <div className="card-header">
+                <h2>Performance</h2>
+              </div>
+              <div className="stat-grid">
+                <div className="stat">
+                  <div className="value cyan">
+                    {m.avg_latency_s != null ? `${m.avg_latency_s}s` : "—"}
+                  </div>
+                  <div className="label">Avg Latency</div>
+                </div>
+                <div className="stat">
+                  <div className="value cyan">
+                    {m.avg_first_token_s != null
+                      ? `${m.avg_first_token_s}s`
+                      : "—"}
+                  </div>
+                  <div className="label">Avg TTFT</div>
+                </div>
+                <div className="stat">
+                  <div className="value cyan">
+                    {m.avg_tokens_per_sec != null ? m.avg_tokens_per_sec : "—"}
+                  </div>
+                  <div className="label">Tokens/s</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="card card-flush">
+              <div className="card-header">
+                <h2>Token Usage</h2>
+              </div>
+              <div className="stat-grid">
+                <div className="stat">
+                  <div className="value blue">
+                    {m.total_prompt_tokens ?? "—"}
+                  </div>
+                  <div className="label">Prompt Tokens</div>
+                </div>
+                <div className="stat">
+                  <div className="value green">
+                    {m.total_completion_tokens ?? "—"}
+                  </div>
+                  <div className="label">Completion Tokens</div>
+                </div>
+                <div className="stat">
+                  <div className="value cyan">
+                    {(m.total_prompt_tokens || 0) +
+                      (m.total_completion_tokens || 0) || "—"}
+                  </div>
+                  <div className="label">Total</div>
+                </div>
+              </div>
+            </div>
+
+            {m.recent && m.recent.length > 0 && (
+              <div className="card card-flush">
+                <div className="card-header">
+                  <h2>Recent Requests</h2>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Endpoint</th>
+                      <th>Latency</th>
+                      <th>TTFT</th>
+                      <th>Tok/s</th>
+                      <th>Prompt</th>
+                      <th>Completion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {m.recent.map((r, i) => (
+                      <tr key={i}>
+                        <td className="mono" style={{ fontSize: 12 }}>
+                          {r.endpoint}
+                        </td>
+                        <td className="mono" style={{ fontSize: 12 }}>
+                          {r.latency_s != null ? `${r.latency_s}s` : "—"}
+                        </td>
+                        <td className="mono" style={{ fontSize: 12 }}>
+                          {r.first_token_s != null
+                            ? `${r.first_token_s}s`
+                            : "—"}
+                        </td>
+                        <td className="mono" style={{ fontSize: 12 }}>
+                          {r.tokens_per_sec ?? "—"}
+                        </td>
+                        <td className="mono" style={{ fontSize: 12 }}>
+                          {r.prompt_tokens}
+                        </td>
+                        <td className="mono" style={{ fontSize: 12 }}>
+                          {r.completion_tokens}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        );
+      }
+
+      // ═══════════════════════════════════════════════════════
+      //  Settings Tab
+      // ═══════════════════════════════════════════════════════
+
+      function SettingsTab() {
+        const [config, setConfig] = useState(null);
+        const [toast, setToast] = useState(null);
+        const [form, setForm] = useState({});
+
+        useEffect(() => {
+          fetch(`${API}/dashboard/api/config`)
+            .then((r) => r.json())
+            .then((c) => {
+              setConfig(c);
+              setForm({ ...c });
+            })
+            .catch(() => {});
+        }, []);
+
+        const save = () => {
+          fetch(`${API}/dashboard/api/config`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(form),
+          })
+            .then((r) => r.json())
+            .then((d) => {
+              setConfig(d.config);
+              setForm({ ...d.config });
+              setToast(
+                d.updated.length > 0
+                  ? `Updated: ${d.updated.join(", ")}`
+                  : "No changes",
+              );
+              setTimeout(() => setToast(null), 2500);
+            })
+            .catch(() => {});
+        };
+
+        if (!config) return <div className="empty">Loading settings...</div>;
+
+        const fields = [
+          {
+            key: "model_name",
+            label: "Model Name (all requests renamed to this)",
+            type: "text",
+            desc: "The Ollama model name used for inference",
+          },
+          {
+            key: "max_retries",
+            label: "Max Retries",
+            type: "number",
+            desc: "Retry count on connection failure",
+          },
+          {
+            key: "retry_base_delay",
+            label: "Retry Base Delay (s)",
+            type: "number",
+            desc: "Exponential backoff base",
+          },
+          {
+            key: "max_concurrent_inferences",
+            label: "Max Concurrent Inferences",
+            type: "number",
+            desc: "GPU request queue limit",
+          },
+          {
+            key: "connect_timeout",
+            label: "Connect Timeout (s)",
+            type: "number",
+            desc: "HTTP connection timeout",
+          },
+          {
+            key: "read_timeout",
+            label: "Read Timeout (s)",
+            type: "number",
+            desc: "HTTP read timeout for inference",
+          },
+        ];
+
+        return (
+          <>
+            <div className="page-title">Settings</div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+                maxWidth: 800,
+              }}
+            >
+              <div className="card">
+                <div className="card-header">
+                  <h2>Runtime Configuration</h2>
+                </div>
+                <div className="card-body">
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text3)",
+                      marginBottom: 16,
+                    }}
+                  >
+                    Changes apply immediately — no restart needed.
+                  </p>
+                  {fields.map((f) => (
+                    <div className="form-group" key={f.key}>
+                      <label>{f.label}</label>
+                      <input
+                        type={f.type}
+                        value={form[f.key] ?? ""}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            [f.key]:
+                              f.type === "number"
+                                ? Number(e.target.value)
+                                : e.target.value,
+                          })
+                        }
+                        step={f.type === "number" ? "any" : undefined}
+                        placeholder={f.desc}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    className="btn btn-primary"
+                    onClick={save}
+                    style={{ width: "100%", marginTop: 4 }}
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+              <div className="card" style={{ alignSelf: "start" }}>
+                <div className="card-header">
+                  <h2>Active Config</h2>
+                </div>
+                <div className="card-body">
+                  <div className="json-view">
+                    {JSON.stringify(config, null, 2)}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {toast && <div className="toast">{toast}</div>}
+          </>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>

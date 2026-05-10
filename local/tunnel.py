@@ -1,6 +1,5 @@
 import logging
 import threading
-import time
 
 from sshtunnel import SSHTunnelForwarder
 
@@ -10,13 +9,14 @@ logger = logging.getLogger(__name__)
 
 
 class TunnelManager:
-    """Manages an SSH tunnel to the remote vLLM server with auto-reconnect."""
+    """Manages an SSH tunnel with auto-reconnect and exponential backoff."""
 
     def __init__(self) -> None:
         self._tunnel: SSHTunnelForwarder | None = None
         self._lock = threading.Lock()
         self._monitor_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
+        self._consecutive_failures = 0
 
     # ── public API ──────────────────────────────────────────
 
@@ -35,9 +35,8 @@ class TunnelManager:
                 settings.ssh_port,
             )
         self._stop_event.clear()
-        self._monitor_thread = threading.Thread(
-            target=self._monitor_loop, daemon=True
-        )
+        self._consecutive_failures = 0
+        self._monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self._monitor_thread.start()
 
     def stop(self) -> None:
@@ -75,25 +74,47 @@ class TunnelManager:
             kwargs["ssh_password"] = settings.ssh_password
         self._tunnel = SSHTunnelForwarder(**kwargs)
 
+    def _reconnect(self) -> bool:
+        """Attempt to reconnect. Returns True on success."""
+        try:
+            if self._tunnel:
+                self._tunnel.stop()
+        except Exception:
+            pass
+        try:
+            self._create_tunnel()
+            assert self._tunnel is not None
+            self._tunnel.start()
+            self._consecutive_failures = 0
+            logger.info("SSH tunnel reconnected successfully.")
+            return True
+        except Exception:
+            self._consecutive_failures += 1
+            logger.exception(
+                "Reconnect failed (consecutive failures: %d).",
+                self._consecutive_failures,
+            )
+            return False
+
     def _monitor_loop(self) -> None:
-        """Periodically check tunnel health and reconnect if needed."""
+        """Periodically check tunnel health and reconnect with backoff."""
         while not self._stop_event.is_set():
-            time.sleep(15)
+            # Wait (interruptible) for the next health check
+            self._stop_event.wait(settings.tunnel_check_interval)
             if self._stop_event.is_set():
                 break
+
             with self._lock:
                 if self._tunnel and not self._tunnel.is_active:
                     logger.warning("SSH tunnel dropped — reconnecting...")
-                    try:
-                        self._tunnel.stop()
-                    except Exception:
-                        pass
-                    try:
-                        self._create_tunnel()
-                        self._tunnel.start()
-                        logger.info("SSH tunnel reconnected.")
-                    except Exception:
-                        logger.exception("Failed to reconnect SSH tunnel.")
+                    if not self._reconnect():
+                        # Exponential backoff capped at max delay
+                        backoff = min(
+                            settings.retry_base_delay * (2**self._consecutive_failures),
+                            settings.tunnel_max_reconnect_delay,
+                        )
+                        logger.info("Next reconnect attempt in %.1fs", backoff)
+                        self._stop_event.wait(backoff)
 
 
 tunnel_manager = TunnelManager()
