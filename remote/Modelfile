@@ -1,4 +1,4 @@
-FROM ./Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf
+FROM ./Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf
 
 PARSER qwen3-coder
 RENDERER qwen3-coder

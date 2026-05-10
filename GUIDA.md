@@ -173,22 +173,22 @@ ssh user@server
 cd ~/ollama-server
 
 # Usa il link "resolve" (non "blob") per il download diretto
-wget https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf
+wget https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf
 ```
 
 > **Se il server non ha accesso a internet**, scarica dal tuo PC e trasferisci via SCP:
 >
 > ```powershell
 > # Dal tuo PC Windows
-> Invoke-WebRequest -Uri "https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf" -OutFile "Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf"
-> scp Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf user@server:~/ollama-server/
+> Invoke-WebRequest -Uri "https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf" -OutFile "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
+> scp Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf user@server:~/ollama-server/
 > ```
 
 3. **Crea un Modelfile** che dice a Ollama di usare quel GGUF:
 
 ```bash
 cat > Modelfile <<'EOF'
-FROM ./Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf
+FROM ./Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf
 EOF
 ```
 
@@ -210,6 +210,7 @@ kill %1
 ```
 
 > Per importare con il Modelfile personalizzato (con template e tool calling), usa quello dalla cartella `remote/` del progetto (già presente in `~/ollama-server/` dopo l'`scp`):
+>
 > ```bash
 > ollama create qwen3-coder:30b -f ~/ollama-server/Modelfile
 > ```
@@ -217,7 +218,7 @@ kill %1
 5. **Pulizia** — dopo il `create`, Ollama copia il GGUF nei suoi blob. Puoi eliminare il file originale:
 
 ```bash
-rm Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf Modelfile
+rm Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf Modelfile
 ```
 
 > **Nota:** Il nome che dai al `create` (es. `qwen3-coder:30b`) è quello che userai in `MODEL_NAME` nel `.env`.
