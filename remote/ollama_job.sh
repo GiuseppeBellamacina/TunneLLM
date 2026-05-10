@@ -18,7 +18,7 @@
 #
 # Usage:
 #   sbatch ollama_job.sh                   # modello default
-#   sbatch ollama_job.sh qwen2.5:14b       # modello specifico
+#   sbatch ollama_job.sh qwen3.6:35b       # modello specifico
 #
 # Per cambiare QoS/risorse, modifica le direttive #SBATCH sopra
 # oppure usa override da CLI:
@@ -33,7 +33,7 @@
 
 set -euo pipefail
 
-MODEL="${1:-qwen3-coder:30b}"
+MODEL="${1:-qwen3.6:35b}"
 OLLAMA_PORT="${OLLAMA_PORT:-11434}"
 INFO_DIR="$HOME/ollama-server"
 INFO_FILE="$INFO_DIR/node_info.txt"

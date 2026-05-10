@@ -7,7 +7,7 @@
     SSH target in the format user@host (e.g., root@192.168.1.100)
 
 .PARAMETER Model
-    Name of the model to transfer (default: from .env MODEL_NAME, or qwen3-coder:latest).
+    Name of the model to transfer (default: from .env MODEL_NAME, or qwen3.6:35b).
 
 .PARAMETER SshPort
     SSH port (default: 22)
@@ -36,7 +36,7 @@ if (-not $Model) {
         $match = Select-String -Path $envFile -Pattern '^\s*MODEL_NAME\s*=\s*(.+)' | Select-Object -First 1
         if ($match) { $Model = $match.Matches[0].Groups[1].Value.Trim('"', "'", ' ') }
     }
-    if (-not $Model) { $Model = "qwen3-coder:latest" }
+    if (-not $Model) { $Model = "qwen3.6:35b" }
 }
 
 # Ollama models directory on Windows
