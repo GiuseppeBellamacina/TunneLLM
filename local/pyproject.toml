@@ -10,6 +10,13 @@ dependencies = [
     "sshtunnel>=0.4.0",
     "paramiko>=3.0,<4.0",
     "pydantic-settings>=2.0.0",
+    "airllm>=2.11.0",
+    "torch>=2.11.0",
+    "transformers>=4.40.0,<4.49",
+    "accelerate>=1.13.0",
+    "optimum>=1.16.0,<2.0",
+    "sentencepiece>=0.2.1",
+    "hf-xet>=1.5.0",
 ]
 
 [build-system]
